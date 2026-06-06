@@ -522,6 +522,47 @@ dd {
   line-height: 1.5;
 }
 
+.brain-result {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.brain-result.accepted {
+  border: 1px solid #2a7a4a;
+  background: rgba(42, 122, 74, 0.12);
+  color: #5dba85;
+}
+
+.brain-result.rejected {
+  border: 1px solid #7a2a2a;
+  background: rgba(122, 42, 42, 0.12);
+  color: #e06060;
+}
+
+.brain-result strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.brain-result small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.brain-result ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 13px;
+}
+
+.brain-result ul li {
+  margin-bottom: 2px;
+}
+
+
 .market-row {
   display: grid;
   width: 100%;

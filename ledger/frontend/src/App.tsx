@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BadgeCheck,
+  Brain,
   CircleDollarSign,
   Flag,
   RefreshCcw,
@@ -27,6 +28,16 @@ import "./styles.css";
 
 const OUTCOMES = ["Pending", "Kept", "Breached"];
 const ONCHAIN_MILESTONE = 1;
+const BRAIN_API_URL = import.meta.env.VITE_BRAIN_API_URL ?? "http://127.0.0.1:8790";
+
+type BrainReview = {
+  accepted: boolean;
+  reasons: string[];
+  predType: number;
+  paramsBlob: string;
+  paramsSummary: string;
+  tier: string;
+} | null;
 
 type Profile = {
   score: bigint;
@@ -127,6 +138,12 @@ function App() {
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
+  // Brain intake integration
+  const [goalText, setGoalText] = useState("");
+  const [scenarioId, setScenarioId] = useState("l2-delivery");
+  const [brainReview, setBrainReview] = useState<BrainReview>(null);
+  const [brainPending, setBrainPending] = useState(false);
+
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
   const activeQuest = selected ? (selected.outcome === 0n ? "Trading" : OUTCOMES[Number(selected.outcome)]) : "Scout";
@@ -186,6 +203,53 @@ function App() {
     const contracts = await getWriteContracts();
     setAccount(contracts.account);
     setMessage(`Wallet linked: ${short(contracts.account)}.`);
+  }
+
+  async function reviewGoal() {
+    if (!goalText.trim()) {
+      setMessage("Enter a goal first.");
+      return;
+    }
+    setBrainPending(true);
+    setBrainReview(null);
+    try {
+      const resp = await fetch(`${BRAIN_API_URL}/api/intake/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: goalText, stakeEth: bond, scenarioId }),
+      });
+      const data = await resp.json() as {
+        accepted: boolean;
+        analysis: { reasons: string[]; tier: string };
+        predicate?: { predType: number; paramsBlob: string; paramsSummary: string };
+      };
+      setBrainReview({
+        accepted: data.accepted,
+        reasons: data.analysis.reasons,
+        tier: data.analysis.tier,
+        predType: data.predicate?.predType ?? ONCHAIN_MILESTONE,
+        paramsBlob: data.predicate?.paramsBlob ?? "",
+        paramsSummary: data.predicate?.paramsSummary ?? "",
+      });
+      if (data.accepted && data.predicate?.paramsBlob) {
+        // Auto-fill milestone target from Brain's compiled paramsBlob
+        try {
+          const { AbiCoder: AC } = await import("ethers");
+          const decoded = AC.defaultAbiCoder().decode(["address"], data.predicate.paramsBlob);
+          setTarget(decoded[0] as string);
+        } catch {
+          // paramsBlob not an address (L1/L3) — keep existing target
+        }
+        setMessage(`Brain approved: ${data.predicate.paramsSummary}`);
+      } else {
+        setMessage(`Brain rejected: ${data.analysis.reasons.join("; ")}`);
+      }
+    } catch (err) {
+      setMessage(`Brain API unavailable — fill milestone target manually.`);
+      setBrainReview(null);
+    } finally {
+      setBrainPending(false);
+    }
   }
 
   async function createPact() {
@@ -345,21 +409,67 @@ function App() {
               <h2>Create Pact</h2>
               <button className="icon-button close" onClick={() => setShowCreate(false)} title="Close"><X size={16} /></button>
             </div>
+
+            {/* Brain goal intake */}
             <label>
-              Milestone target
-              <input id="milestone-input" value={target} onChange={(event) => setTarget(event.target.value)} />
+              Commitment goal (natural language)
+              <input
+                id="milestone-input"
+                placeholder="e.g. Q3 结束前完成主网上线并公布合约地址"
+                value={goalText}
+                onChange={(e) => { setGoalText(e.target.value); setBrainReview(null); }}
+              />
             </label>
             <div className="split">
+              <label>
+                Scenario
+                <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)}>
+                  <option value="l2-delivery">L2 Project delivery</option>
+                  <option value="l1-habit">L1 Personal habit</option>
+                  <option value="l3-policy">L3 Public accountability</option>
+                </select>
+              </label>
               <label>
                 Bond ETH
                 <input value={bond} onChange={(event) => setBond(event.target.value)} />
               </label>
-              <label>
-                Deadline min
-                <input value={deadlineMinutes} onChange={(event) => setDeadlineMinutes(event.target.value)} />
-              </label>
             </div>
-            <button className="wide primary" onClick={createPact}><Target size={16} /> List Quest</button>
+            <button className="wide" onClick={reviewGoal} disabled={brainPending}>
+              <Brain size={16} /> {brainPending ? "Analyzing…" : "Review with Brain Agent"}
+            </button>
+
+            {/* Brain review result */}
+            {brainReview && (
+              <div className={`brain-result ${brainReview.accepted ? "accepted" : "rejected"}`}>
+                {brainReview.accepted ? (
+                  <>
+                    <strong>✓ Goal approved</strong>
+                    <small>{brainReview.paramsSummary}</small>
+                  </>
+                ) : (
+                  <>
+                    <strong>✗ Goal rejected</strong>
+                    <ul>{brainReview.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                  </>
+                )}
+              </div>
+            )}
+
+            <label>
+              Milestone target address
+              <input value={target} onChange={(event) => setTarget(event.target.value)} />
+            </label>
+            <label>
+              Deadline min
+              <input value={deadlineMinutes} onChange={(event) => setDeadlineMinutes(event.target.value)} />
+            </label>
+            <button
+              className="wide primary"
+              onClick={createPact}
+              disabled={brainReview !== null && !brainReview.accepted}
+            >
+              <Target size={16} /> List Quest
+            </button>
             <div className="hint-box">
               Subject stakes the bond. Commit backs delivery. Skeptic prices breach risk.
             </div>
