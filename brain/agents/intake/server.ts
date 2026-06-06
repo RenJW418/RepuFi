@@ -23,7 +23,9 @@ export function createGoalIntakeHttpServer(): Server {
       const input = parseGoalIntakeInput(await readJson(request));
       writeJson(response, 200, reviewGoalIntake(input));
     } catch (error) {
-      writeJson(response, 400, { error: error instanceof Error ? error.message : "Invalid intake request" });
+      writeJson(response, 400, {
+        error: error instanceof Error ? error.message : "Invalid intake request",
+      });
     }
   });
 }

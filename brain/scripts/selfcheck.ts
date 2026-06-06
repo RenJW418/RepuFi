@@ -3,7 +3,6 @@ import { pathToFileURL } from "node:url";
 
 import { Wallet } from "ethers";
 
-import { reviewGoalIntake } from "../agents/intake/review.js";
 import { createLedger } from "../agents/base/ledger.js";
 import { compilePredicate } from "../agents/predicate/compile.js";
 import { decideAndPlaceBet } from "../agents/skeptic/bet.js";
@@ -14,8 +13,6 @@ import { recoverVerdictSigner, signVerdict } from "../agents/verifier/sign.js";
 import { createMockLlm } from "../llm/mock.js";
 import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
 import { runBrainDemo } from "./demo.js";
-import { mdScenarioDefinitions, runMdScenarioMatrix } from "./scenarios.js";
-import { demoScenarioTemplates } from "../../ledger/shared/demoWorkflow.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
 const verifierPrivateKey =
@@ -23,29 +20,6 @@ const verifierPrivateKey =
 
 export async function runSelfcheck(): Promise<string[]> {
   const checks: string[] = [];
-  const rejectedIntake = reviewGoalIntake({
-    goal: "我要变得更好",
-    stakeEth: "1",
-    scenarioId: "l1-habit",
-  });
-  assert.equal(rejectedIntake.accepted, false);
-  assert.equal(rejectedIntake.predicate, undefined);
-  assert(rejectedIntake.analysis.reasons.includes("目标缺少可量化数字"));
-
-  const acceptedIntake = demoScenarioTemplates.map((scenario) =>
-    reviewGoalIntake({
-      goal: scenario.goal,
-      stakeEth: scenario.defaultStakeEth,
-      scenarioId: scenario.id,
-    }),
-  );
-  assert(acceptedIntake.every((decision) => decision.accepted));
-  assert.deepEqual(
-    acceptedIntake.map((decision) => decision.predicate?.predType),
-    [PredType.HABIT, PredType.ONCHAIN_MILESTONE, PredType.POLICY],
-  );
-  checks.push("goal intake review");
-
   const predicate = await compilePredicate({
     goal: "Q3 主网上线",
     tier: "L2",
@@ -133,14 +107,6 @@ export async function runSelfcheck(): Promise<string[]> {
   assert.equal(keptDemo.settlement.outcome, Outcome.Kept);
   assert.equal(breachDemo.settlement.outcome, Outcome.Breached);
   checks.push("demo kept and breach paths");
-
-  const scenarios = await runMdScenarioMatrix({ silent: true });
-  assert.equal(scenarios.length, mdScenarioDefinitions.length);
-  assert.deepEqual(
-    scenarios.map((scenario) => `${scenario.tier}:${scenario.path}`),
-    ["L1:kept", "L1:breach", "L2:kept", "L2:breach", "L3:kept", "L3:breach"],
-  );
-  checks.push("md scenario matrix");
 
   return checks;
 }

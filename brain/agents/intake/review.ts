@@ -4,7 +4,7 @@ import {
   scenarioById,
   type DemoPredicate,
   type GoalAnalysis,
-} from "../../../ledger/shared/demoWorkflow.js";
+} from "../../shared/demoWorkflow.js";
 
 export interface GoalIntakeInput {
   goal: string;
@@ -21,12 +21,8 @@ export interface GoalIntakeDecision {
 export function reviewGoalIntake(input: GoalIntakeInput): GoalIntakeDecision {
   const analysis = analyzeGoalForDemo(input);
   if (!analysis.accepted) {
-    return {
-      accepted: false,
-      analysis,
-    };
+    return { accepted: false, analysis };
   }
-
   return {
     accepted: true,
     analysis,

@@ -3,10 +3,11 @@ import { getAddress, keccak256, toUtf8Bytes } from "ethers";
 import type { Tier } from "../shared/schemas.js";
 
 export interface LlmRequest {
-  task: "compile-predicate" | "verify-habit" | "verify-policy";
+  task: "compile-predicate" | "verify-habit" | "verify-policy" | "validate-goal" | "multi-agent-verdict";
   goal: string;
   tier: Tier;
   evidence?: unknown;
+  agentId?: number;
 }
 
 export interface BrainLlm {
@@ -25,6 +26,27 @@ export function createMockLlm(): BrainLlm {
           outcomeHint: "kept",
           confidence: 0.72,
           citations: ["mock://policy/source/primary", "mock://policy/source/secondary"],
+        };
+      }
+
+      if (request.task === "validate-goal") {
+        const vague = /变得更|努力|尽量|争取/.test(request.goal);
+        return {
+          valid: !vague,
+          reason: vague
+            ? "目标缺乏可量化指标"
+            : "目标包含可量化指标，可生成谓词",
+          suggestions: vague ? ["加入具体数字或截止日期"] : [],
+        };
+      }
+
+      if (request.task === "multi-agent-verdict") {
+        const agentId = request.agentId ?? 0;
+        return {
+          outcomeHint: "kept",
+          confidence: 0.75 + agentId * 0.01,
+          agentId,
+          reasoning: `Agent ${agentId} 分析：证据来源可信，目标达成。`,
         };
       }
 

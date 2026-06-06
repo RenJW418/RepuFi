@@ -2,10 +2,7 @@ import { pathToFileURL } from "node:url";
 
 import { createGoalIntakeHttpServer } from "../agents/intake/server.js";
 
-export function runGoalIntakeServer(input: {
-  host?: string;
-  port?: number;
-} = {}): void {
+export function runGoalIntakeServer(input: { host?: string; port?: number } = {}): void {
   const host = input.host ?? process.env.BRAIN_HOST ?? "127.0.0.1";
   const port = input.port ?? Number(process.env.BRAIN_PORT ?? "8790");
   const server = createGoalIntakeHttpServer();
