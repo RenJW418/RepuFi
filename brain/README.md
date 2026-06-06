@@ -10,9 +10,12 @@ Run from the repository root:
 npm run brain:test
 npm run brain:typecheck
 npm run brain:selfcheck
+npm run brain:scenarios
 npm run brain:demo -- --path kept
 npm run brain:demo -- --path breach
 ```
+
+`brain:scenarios` runs the MD scenario matrix: L1 habit, L2 delivery, and L3 policy commitments, each through kept and breached paths. Every scenario compiles a predicate, creates a pact, prices from credibility, places a Brain position, signs a verdict, settles, and asserts the credibility delta.
 
 For real module-one integration:
 

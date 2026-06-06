@@ -9,6 +9,8 @@
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.ts --network localhost",
     "demo": "tsx scripts/seedDemo.ts",
+    "demo:scenarios": "hardhat run scripts/demoScenarios.ts",
+    "seed:plaza": "hardhat run scripts/seedPlaza.ts --network localhost",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build"
   },

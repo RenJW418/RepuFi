@@ -17,10 +17,13 @@
     "ledger:test": "npm --prefix ledger test",
     "ledger:deploy": "npm --prefix ledger run deploy",
     "ledger:demo": "npm --prefix ledger run demo",
+    "ledger:demo:scenarios": "npm --prefix ledger run demo:scenarios",
+    "ledger:seed:plaza": "npm --prefix ledger run seed:plaza",
     "ledger:frontend:dev": "npm --prefix ledger run frontend:dev",
     "ledger:frontend:build": "npm --prefix ledger run frontend:build",
     "brain:demo": "npm --prefix brain run demo --",
     "brain:smoke": "npm --prefix brain run repuFi:smoke",
+    "brain:scenarios": "npm --prefix brain run scenarios",
     "brain:selfcheck": "npm --prefix brain run selfcheck",
     "brain:test": "npm --prefix brain test",
     "brain:typecheck": "npm --prefix brain run typecheck"

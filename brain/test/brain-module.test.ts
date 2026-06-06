@@ -12,6 +12,7 @@ import { verifyOnchainMilestone } from "../agents/verifier/onchain.js";
 import { recoverVerdictSigner, signVerdict } from "../agents/verifier/sign.js";
 import { createMockLlm } from "../llm/mock.js";
 import { runBrainDemo } from "../scripts/demo.js";
+import { mdScenarioDefinitions, runMdScenarioMatrix } from "../scripts/scenarios.js";
 import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
@@ -156,6 +157,34 @@ describe("Brain module selfcheck", () => {
     expect(kept.profile.score).toBeGreaterThan(0n);
     expect(breached.settlement.outcome).toBe(Outcome.Breached);
     expect(breached.profile.broken).toBe(1);
+  });
+
+  it("runs the MD scenario matrix across L1, L2, and L3 kept/breach paths", async () => {
+    const scenarios = await runMdScenarioMatrix({ silent: true });
+
+    expect(scenarios).toHaveLength(mdScenarioDefinitions.length);
+    expect(scenarios.map((scenario) => scenario.id)).toEqual([
+      "l1-habit-kept",
+      "l1-habit-breach",
+      "l2-delivery-kept",
+      "l2-delivery-breach",
+      "l3-policy-kept",
+      "l3-policy-breach",
+    ]);
+    for (const scenario of scenarios) {
+      expect(scenario.bet.placed).toBe(true);
+      expect(scenario.marketBreachProbability).toBe(0.5);
+      if (scenario.path === "kept") {
+        expect(scenario.outcome).toBe(Outcome.Kept);
+        expect(scenario.finalProfile.kept).toBe(scenario.initialProfile.kept + 1);
+        expect(scenario.finalProfile.score).toBeGreaterThan(scenario.initialProfile.score);
+      } else {
+        expect(scenario.outcome).toBe(Outcome.Breached);
+        expect(scenario.finalProfile.broken).toBe(scenario.initialProfile.broken + 1);
+        expect(scenario.finalProfile.permanentStain).toBe(true);
+        expect(scenario.finalProfile.score).toBeLessThan(scenario.initialProfile.score);
+      }
+    }
   });
 
   it("creates deterministic L1 coach nudges without touching ledger state", () => {

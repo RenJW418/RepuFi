@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, type ContractRunner } from "ethers";
 import addresses from "../../shared/addresses.json";
 import credibilityAbi from "../../shared/abis/CredibilitySBT.json";
 import marketAbi from "../../shared/abis/PactMarket.json";
@@ -54,7 +54,7 @@ export async function walletProvider() {
   return new BrowserProvider(eth);
 }
 
-export function getReadContracts(provider = readProvider()) {
+export function getReadContracts(provider: ContractRunner = readProvider()) {
   return {
     market: new Contract(addresses.PactMarket, marketAbi, provider),
     resolver: new Contract(addresses.Resolver, resolverAbi, provider),
@@ -67,6 +67,7 @@ export async function getWriteContracts() {
   const signer = await provider.getSigner();
   return {
     account: await signer.getAddress(),
+    signer,
     market: new Contract(addresses.PactMarket, marketAbi, signer),
     resolver: new Contract(addresses.Resolver, resolverAbi, signer),
     credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, signer)

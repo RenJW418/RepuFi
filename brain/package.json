@@ -6,6 +6,7 @@
   "scripts": {
     "demo": "tsx scripts/demo.ts",
     "repuFi:smoke": "tsx scripts/repuFiSmoke.ts",
+    "scenarios": "tsx scripts/scenarios.ts",
     "selfcheck": "tsx scripts/selfcheck.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

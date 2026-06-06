@@ -13,6 +13,7 @@ import { recoverVerdictSigner, signVerdict } from "../agents/verifier/sign.js";
 import { createMockLlm } from "../llm/mock.js";
 import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
 import { runBrainDemo } from "./demo.js";
+import { mdScenarioDefinitions, runMdScenarioMatrix } from "./scenarios.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
 const verifierPrivateKey =
@@ -107,6 +108,14 @@ export async function runSelfcheck(): Promise<string[]> {
   assert.equal(keptDemo.settlement.outcome, Outcome.Kept);
   assert.equal(breachDemo.settlement.outcome, Outcome.Breached);
   checks.push("demo kept and breach paths");
+
+  const scenarios = await runMdScenarioMatrix({ silent: true });
+  assert.equal(scenarios.length, mdScenarioDefinitions.length);
+  assert.deepEqual(
+    scenarios.map((scenario) => `${scenario.tier}:${scenario.path}`),
+    ["L1:kept", "L1:breach", "L2:kept", "L2:breach", "L3:kept", "L3:breach"],
+  );
+  checks.push("md scenario matrix");
 
   return checks;
 }
