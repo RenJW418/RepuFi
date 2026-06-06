@@ -50,6 +50,19 @@ npm run frontend:dev
 - `ledger/shared/addresses.json`
 - `ledger/shared/abis/*.json`
 
+测试网部署准备：
+
+```bash
+cp .env.example .env.local
+# 填 REPUFI_TESTNET_RPC_URL / REPUFI_TESTNET_CHAIN_ID / REPUFI_TESTNET_PRIVATE_KEY / VITE_RPC_URL
+npm run deploy:testnet
+npm run ledger:seed:plaza:testnet
+npm run brain:intake
+npm run frontend:dev
+```
+
+需要准备一个只放测试币的部署钱包。`deploy:testnet` 会部署 `CredibilitySBT`、`PactMarket`、`Resolver`、`RepuToken`、`OnchainMilestoneAdapter`，并把最新地址写入 `ledger/shared/addresses.json`。前端 Vite 配置会读取仓库根目录 `.env.local`，所以 `VITE_RPC_URL` 要和 `REPUFI_TESTNET_RPC_URL` 指向同一个测试网 RPC。测试网默认用部署钱包兼任 verifier、reviewer、insurance treasury、community treasury；如果要分离角色，可以在 `.env.local` 里填 `REPUFI_TESTNET_VERIFIER_ADDRESS`、`REPUFI_TESTNET_REVIEWER_ADDRESS`、`REPUFI_TESTNET_INSURANCE_TREASURY`、`REPUFI_TESTNET_COMMUNITY_TREASURY`。
+
 ## 三类 case 演示流程
 
 1. 启动本地链并部署：

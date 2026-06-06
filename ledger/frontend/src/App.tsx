@@ -19,16 +19,14 @@ import {
   buildDemoResolution,
   compileDemoPredicate,
   demoScenarioTemplates,
-  eligibleReviewVoters,
   scenarioById,
   type DemoPredicate,
   type DemoResolution,
   type DemoScenarioTemplate,
   type GoalAnalysis,
-  type ReviewVoter,
   type ScenarioCategory
 } from "../../shared/demoWorkflow";
-import { Outcome, PredType, Side, type Hex } from "../../shared/schemas";
+import { Outcome, PredType, Side } from "../../shared/schemas";
 import {
   demoWalletRoles,
   getLocalVerifierSigner,
@@ -36,9 +34,11 @@ import {
   getWriteContracts,
   loadPactCreated,
   loadPriceHistory,
+  loadReviewVoters,
   Pact,
   PactRow,
   PricePoint,
+  ReviewVoterRow,
   rpcUrl,
   type DemoWalletRoleId
 } from "./contracts";
@@ -48,20 +48,6 @@ const OUTCOMES = ["Pending", "Kept", "Breached"];
 const SIDES = ["Commit", "Skeptic"];
 const ALL_CATEGORIES = "All";
 const brainApiUrl = import.meta.env.VITE_BRAIN_API_URL ?? "http://127.0.0.1:8790";
-const DEFAULT_REVIEW_SUBJECT = "0x4000000000000000000000000000000000000004" as Hex;
-const DEFAULT_PARTICIPANTS = [
-  { address: "0x1000000000000000000000000000000000000001", side: Side.Commit },
-  { address: "0x2000000000000000000000000000000000000002", side: Side.Skeptic }
-] as const;
-const DEFAULT_RELATED = ["0x3000000000000000000000000000000000000003"] as const;
-const DEFAULT_TOKEN_HOLDERS = [
-  "0x1000000000000000000000000000000000000001",
-  "0x2000000000000000000000000000000000000002",
-  "0x3000000000000000000000000000000000000003",
-  DEFAULT_REVIEW_SUBJECT,
-  "0x5000000000000000000000000000000000000005"
-] as const;
-
 type Profile = {
   score: bigint;
   kept: bigint;
@@ -209,6 +195,7 @@ function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reviewTokenBalance, setReviewTokenBalance] = useState<bigint>(0n);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [reviewVoters, setReviewVoters] = useState<ReviewVoterRow[]>([]);
   const [message, setMessage] = useState("");
   const [scenarioId, setScenarioId] = useState(demoScenarioTemplates[0].id);
   const [goal, setGoal] = useState(demoScenarioTemplates[0].goal);
@@ -239,16 +226,6 @@ function App() {
       return category === ALL_CATEGORIES || rowCategory === category;
     });
   }, [category, metadataById, rows]);
-  const reviewVoters = useMemo<ReviewVoter[]>(
-    () =>
-      eligibleReviewVoters({
-        subject: DEFAULT_REVIEW_SUBJECT,
-        participants: DEFAULT_PARTICIPANTS,
-        relatedParties: DEFAULT_RELATED,
-        tokenHolders: DEFAULT_TOKEN_HOLDERS
-      }),
-    []
-  );
   const resolution = useMemo<DemoResolution>(() => {
     const oracleOutcome = resolutionMode === "agree" ? Outcome.Kept : Outcome.Kept;
     const agentOutcomes: Array<Outcome.Kept | Outcome.Breached> =
@@ -259,8 +236,8 @@ function App() {
       scenario: selectedScenario,
       oracleOutcome,
       agentOutcomes,
-      participants: DEFAULT_PARTICIPANTS,
-      relatedParties: DEFAULT_RELATED,
+      participants: [],
+      relatedParties: [],
       reviewVoters
     });
   }, [resolutionMode, reviewVoters, selectedScenario]);
@@ -274,14 +251,16 @@ function App() {
     }
     if (nextSelectedId) {
       const { market } = getReadContracts();
-      const [pact, prob, history] = await Promise.all([
+      const [pact, prob, history, voters] = await Promise.all([
         market.getPact(nextSelectedId),
         market.impliedBreachProb(nextSelectedId),
-        loadPriceHistory(nextSelectedId)
+        loadPriceHistory(nextSelectedId),
+        loadReviewVoters(nextSelectedId)
       ]);
       setSelected(pact as Pact);
       setBreachProb(prob as bigint);
       setPriceHistory(history);
+      setReviewVoters(voters);
     }
   }
 
@@ -410,8 +389,9 @@ function App() {
 
   async function submitDemoVerdict() {
     if (!selectedId) return;
-    const { resolver } = await getWriteContracts(walletRole);
-    const verifierSigner = await getLocalVerifierSigner();
+    const contracts = await getWriteContracts(walletRole);
+    const { resolver } = contracts;
+    const verifierSigner = walletRole === "browser" ? contracts.signer : await getLocalVerifierSigner();
     const evidenceHash = id(`${selectedId}:${selectedScenario.id}:${resolutionMode}:${outcomeLabel(resolution.finalOutcome)}`);
     const digest = await resolver.verdictDigest(selectedId, resolution.oracleOutcome, evidenceHash);
     const sig = await verifierSigner.signMessage(getBytes(digest));
