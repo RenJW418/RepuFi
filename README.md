@@ -18,7 +18,7 @@ The Ledger module implements chain-hosted commitment markets, parimutuel pools, 
 - `ledger/shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
 - `ledger/shared/demoWorkflow.ts`: 三类 demo case 的目标审查、predicate 编译、分类、UMA/多 Agent/人工复核展示模型。
 - `ledger/frontend/`: 从目标输入、Agent 审查、发布广场、分类筛选、下注、裁决、领取到信誉档案的演示工作台。
-- `brain/agents/intake/review.ts`: 后台 Agent intake 入口；拒绝宽泛目标，只有可量化、到期可判断、有客观证据路径的目标才会返回可发布 predicate。
+- `brain/agents/intake/review.ts` 和 `brain/agents/intake/server.ts`: 后台 Agent intake 入口和 HTTP API；网站通过 `POST /api/intake/review` 审查目标，拒绝宽泛目标，只有可量化、到期可判断、有客观证据路径的目标才会返回可发布 predicate。
 - `ledger/scripts/seedDemo.ts`: 不依赖 Brain，直接跑守约/违约两条路径。
 - `ledger/scripts/demoScenarios.ts`: 三类 MD 场景的链上 smoke，逐个创建、下注、签名裁决、领奖。
 
@@ -31,6 +31,7 @@ npm test
 npm run demo
 npm run ledger:demo:scenarios
 npm run ledger:frontend:build
+npm run brain:intake
 npm run brain:selfcheck
 npm run brain:scenarios
 ```
@@ -41,6 +42,7 @@ npm run brain:scenarios
 npm run node
 npm run deploy
 npm run ledger:seed:plaza
+npm run brain:intake
 npm run frontend:dev
 ```
 
@@ -65,7 +67,15 @@ npm run ledger:seed:plaza
 
 `ledger:seed:plaza` 会把 L1 个人纪律、L2 项目交付、L3 公共问责三类场景发布到当前 `ledger/shared/addresses.json` 指向的本地链合约，并各自放入 Commit/Skeptic 流动性。
 
-3. 打开网站：
+3. 启动 Brain 后台 Agent intake API：
+
+```bash
+npm run brain:intake
+```
+
+默认监听 `http://127.0.0.1:8790/api/intake/review`。网页会用 `VITE_BRAIN_API_URL` 调这个接口；未设置时默认 `http://127.0.0.1:8790`。
+
+4. 打开网站：
 
 ```bash
 npm run frontend:dev
@@ -73,7 +83,7 @@ npm run frontend:dev
 
 网页第一屏就是工作台：
 
-- `Goal intake`: 用户选择三类 case，输入目标和质押金额；Agent 只接受可量化、到期可判断、有客观证据路径的目标。
+- `Goal intake`: 用户选择三类 case，输入目标和质押金额；网页调用 Brain 后台 Agent 审查，Agent 只接受可量化、到期可判断、有客观证据路径的目标，并把通过的 predicate 返回给钱包发布流程。
 - `Plaza`: 事件发布后进入广场，可按 `Personal Discipline`、`Project Delivery`、`Public Accountability` 筛选。
 - `Market detail`: 用户进入事件后选择 Commit/Skeptic 和金额，通过钱包下注。
 - `Resolution demo`: 参考 Polymarket/UMA 乐观预言机：oracle proposal、challenge window；当多 Agent consensus 与 oracle 不一致时，调用 `Resolver.submitDisputedVerdict` 开启链上 token-holder review。
@@ -81,7 +91,7 @@ npm run frontend:dev
 - `Submit verifier verdict`: oracle 和 Agent 一致时，用本地部署的授权 verifier 钱包签名提交裁决，最终走 `Resolver.submitVerdict` 上链结算。
 - `Claim` 和 `Credibility`: 赢家领取收益，subject 的 CredibilitySBT 档案更新。
 
-4. 无浏览器 smoke：
+5. 无浏览器 smoke：
 
 ```bash
 npm run ledger:demo:scenarios

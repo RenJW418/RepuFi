@@ -21,6 +21,7 @@ import {
   demoScenarioTemplates,
   eligibleReviewVoters,
   scenarioById,
+  type DemoPredicate,
   type DemoResolution,
   type DemoScenarioTemplate,
   type GoalAnalysis,
@@ -34,6 +35,7 @@ import "./styles.css";
 const OUTCOMES = ["Pending", "Kept", "Breached"];
 const SIDES = ["Commit", "Skeptic"];
 const ALL_CATEGORIES = "All";
+const brainApiUrl = import.meta.env.VITE_BRAIN_API_URL ?? "http://127.0.0.1:8790";
 const DEFAULT_REVIEW_SUBJECT = "0x4000000000000000000000000000000000000004" as Hex;
 const DEFAULT_PARTICIPANTS = [
   { address: "0x1000000000000000000000000000000000000001", side: Side.Commit },
@@ -62,6 +64,11 @@ type DemoPactMetadata = {
   scenarioId: DemoScenarioTemplate["id"];
   category: ScenarioCategory;
   createdAt: number;
+};
+type IntakeDecision = {
+  accepted: boolean;
+  analysis: GoalAnalysis;
+  predicate?: DemoPredicate;
 };
 
 const METADATA_KEY = "repufi.demoPactMetadata.v1";
@@ -132,6 +139,23 @@ function pactCreatedId(market: any, logs: readonly unknown[]) {
   return "";
 }
 
+async function requestGoalIntake(input: {
+  goal: string;
+  stakeEth: string;
+  scenarioId: string;
+}): Promise<IntakeDecision> {
+  const response = await fetch(`${brainApiUrl}/api/intake/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body?.error ?? "Brain intake request failed.");
+  }
+  return body as IntakeDecision;
+}
+
 function App() {
   const [account, setAccount] = useState("");
   const [rows, setRows] = useState<PactRow[]>([]);
@@ -153,6 +177,8 @@ function App() {
   const [analysis, setAnalysis] = useState<GoalAnalysis>(() =>
     analyzeGoalForDemo({ goal: demoScenarioTemplates[0].goal, stakeEth: demoScenarioTemplates[0].defaultStakeEth, scenarioId })
   );
+  const [intakePredicate, setIntakePredicate] = useState<DemoPredicate | undefined>(() => compileDemoPredicate(demoScenarioTemplates[0]));
+  const [intakeLoading, setIntakeLoading] = useState(false);
   const [resolutionMode, setResolutionMode] = useState<"agree" | "disagree">("agree");
   const [metadataById, setMetadataById] = useState<Record<string, DemoPactMetadata>>(() => loadDemoMetadata());
 
@@ -251,10 +277,27 @@ function App() {
     setBond(next.defaultStakeEth);
     setDeadlineMinutes(next.defaultDeadlineMinutes);
     setAnalysis(analyzeGoalForDemo({ goal: next.goal, stakeEth: next.defaultStakeEth, scenarioId: next.id }));
+    setIntakePredicate(compileDemoPredicate(next));
   }
 
-  function analyzeGoal() {
-    setAnalysis(analyzeGoalForDemo({ goal, stakeEth: bond, scenarioId }));
+  async function runBrainIntake() {
+    setIntakeLoading(true);
+    try {
+      const decision = await requestGoalIntake({ goal, stakeEth: bond, scenarioId });
+      setAnalysis(decision.analysis);
+      setIntakePredicate(decision.predicate);
+      setMessage(decision.accepted ? "Brain Agent approved this goal" : "Brain Agent rejected this goal");
+      return decision;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Brain intake request failed");
+      throw error;
+    } finally {
+      setIntakeLoading(false);
+    }
+  }
+
+  async function analyzeGoal() {
+    await runBrainIntake();
   }
 
   async function connect() {
@@ -266,15 +309,16 @@ function App() {
   }
 
   async function createPact() {
-    const currentAnalysis = analyzeGoalForDemo({ goal, stakeEth: bond, scenarioId });
+    const decision = await runBrainIntake();
+    const currentAnalysis = decision.analysis;
     setAnalysis(currentAnalysis);
-    if (!currentAnalysis.accepted) {
+    if (!decision.accepted || !decision.predicate) {
       setMessage("Agent rejected this goal. Tighten metric, deadline, and evidence first.");
       return;
     }
 
     const { market } = await getWriteContracts();
-    const currentPredicate = compileDemoPredicate(activeScenario);
+    const currentPredicate = decision.predicate;
     const deadline = Math.floor(Date.now() / 1000) + Number(deadlineMinutes) * 60;
     const tx = await market.createPact(currentPredicate.predType, currentPredicate.paramsBlob, BigInt(deadline), {
       value: parseEther(bond)
@@ -418,28 +462,29 @@ function App() {
           <div className={`agent-result ${analysis.accepted ? "accepted" : "rejected"}`}>
             <div>
               {analysis.accepted ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-              <strong>{analysis.accepted ? "Agent approved" : "Agent rejected"}</strong>
+              <strong>{analysis.accepted ? "Brain Agent approved" : "Brain Agent rejected"}</strong>
             </div>
             <p>{analysis.reasons.join(" / ")}</p>
             <dl>
+              <div><dt>Backend</dt><dd>{brainApiUrl}</dd></div>
               <div><dt>Quantifier</dt><dd>{analysis.quantifier}</dd></div>
               <div><dt>Deadline</dt><dd>{analysis.deadline}</dd></div>
               <div><dt>Evidence</dt><dd>{analysis.evidenceSource}</dd></div>
             </dl>
           </div>
           <div className="actions">
-            <button onClick={analyzeGoal}>
+            <button onClick={analyzeGoal} disabled={intakeLoading}>
               <SlidersHorizontal size={16} />
-              Analyze
+              {intakeLoading ? "Analyzing..." : "Analyze"}
             </button>
-            <button onClick={createPact}>
+            <button onClick={createPact} disabled={intakeLoading}>
               <Flag size={16} />
               Publish
             </button>
           </div>
           <div className="predicate">
             <span>{activeScenario.category}</span>
-            <code>{predicate.paramsSummary}</code>
+            <code>{intakePredicate?.paramsSummary ?? predicate.paramsSummary}</code>
           </div>
         </div>
 

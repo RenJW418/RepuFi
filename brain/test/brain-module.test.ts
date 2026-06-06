@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { Server } from "node:http";
 import { Wallet } from "ethers";
 
 import { createCoachNudge } from "../agents/coach/nudge.js";
 import { reviewGoalIntake } from "../agents/intake/review.js";
+import { createGoalIntakeHttpServer } from "../agents/intake/server.js";
 import { createLedger } from "../agents/base/ledger.js";
 import { RepuFiLedgerClient } from "../agents/base/repuFiLedger.js";
 import { compilePredicate } from "../agents/predicate/compile.js";
@@ -15,11 +17,28 @@ import { createMockLlm } from "../llm/mock.js";
 import { runBrainDemo } from "../scripts/demo.js";
 import { mdScenarioDefinitions, runMdScenarioMatrix } from "../scripts/scenarios.js";
 import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
-import { demoScenarioTemplates } from "../../ledger/shared/demoWorkflow.js";
+import { demoScenarioTemplates, scenarioById } from "../../ledger/shared/demoWorkflow.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
 const verifierPrivateKey =
   "0x59c6995e998f97a5a004497e5da8e8d40188335a8e5c08c7871a7464a26d70d5";
+
+async function listenOnEphemeralPort(server: Server): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Expected HTTP server to listen on an ephemeral TCP port.");
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
 
 describe("Brain module selfcheck", () => {
   it("rejects broad goal intake before predicate compilation", () => {
@@ -54,6 +73,60 @@ describe("Brain module selfcheck", () => {
     ]);
     for (const decision of decisions) {
       expect(decision.predicate?.paramsBlob).toMatch(/^0x[0-9a-f]+$/);
+    }
+  });
+
+  it("serves backend goal intake review over HTTP for the website", async () => {
+    const server = createGoalIntakeHttpServer();
+    const baseUrl = await listenOnEphemeralPort(server);
+
+    try {
+      const rejected = await fetch(`${baseUrl}/api/intake/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: "我要变得更好", stakeEth: "1", scenarioId: "l1-habit" }),
+      });
+      const rejectedBody = await rejected.json();
+
+      expect(rejected.status).toBe(200);
+      expect(rejectedBody.accepted).toBe(false);
+      expect(rejectedBody.predicate).toBeUndefined();
+
+      const deliveryScenario = scenarioById("l2-delivery");
+      const accepted = await fetch(`${baseUrl}/api/intake/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: deliveryScenario.goal,
+          stakeEth: deliveryScenario.defaultStakeEth,
+          scenarioId: deliveryScenario.id,
+        }),
+      });
+      const acceptedBody = await accepted.json();
+
+      expect(accepted.status).toBe(200);
+      expect(acceptedBody.accepted).toBe(true);
+      expect(acceptedBody.predicate.predType).toBe(PredType.ONCHAIN_MILESTONE);
+      expect(acceptedBody.predicate.paramsBlob).toMatch(/^0x[0-9a-f]+$/);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("allows browser CORS preflight for the goal intake endpoint", async () => {
+    const server = createGoalIntakeHttpServer();
+    const baseUrl = await listenOnEphemeralPort(server);
+
+    try {
+      const response = await fetch(`${baseUrl}/api/intake/review`, {
+        method: "OPTIONS",
+      });
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(response.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    } finally {
+      await closeServer(server);
     }
   });
 

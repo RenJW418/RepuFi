@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "demo": "tsx scripts/demo.ts",
+    "intake": "tsx scripts/intakeServer.ts",
     "repuFi:smoke": "tsx scripts/repuFiSmoke.ts",
     "scenarios": "tsx scripts/scenarios.ts",
     "selfcheck": "tsx scripts/selfcheck.ts",

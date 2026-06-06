@@ -22,6 +22,7 @@
     "ledger:frontend:dev": "npm --prefix ledger run frontend:dev",
     "ledger:frontend:build": "npm --prefix ledger run frontend:build",
     "brain:demo": "npm --prefix brain run demo --",
+    "brain:intake": "npm --prefix brain run intake",
     "brain:smoke": "npm --prefix brain run repuFi:smoke",
     "brain:scenarios": "npm --prefix brain run scenarios",
     "brain:selfcheck": "npm --prefix brain run selfcheck",
