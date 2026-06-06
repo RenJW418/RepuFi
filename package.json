@@ -4,6 +4,11 @@
   "private": true,
   "description": "PACT Ledger module: on-chain commitment market and credibility SBT",
   "scripts": {
+    "brain:demo": "npm --prefix brain run demo --",
+    "brain:smoke": "npm --prefix brain run repuFi:smoke",
+    "brain:selfcheck": "npm --prefix brain run selfcheck",
+    "brain:test": "npm --prefix brain test",
+    "brain:typecheck": "npm --prefix brain run typecheck",
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.ts --network localhost",
