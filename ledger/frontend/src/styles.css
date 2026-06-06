@@ -430,6 +430,52 @@ code {
   grid-column: 2 / span 1;
 }
 
+.runbook {
+  grid-column: 1 / -1;
+}
+
+.runbook-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runbook article {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d8e0de;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfb;
+}
+
+.runbook header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.runbook header span {
+  min-width: 34px;
+  border-radius: 7px;
+  background: #23506a;
+  color: #ffffff;
+  padding: 3px 7px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runbook dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.runbook dl div {
+  min-width: 0;
+}
+
 .status {
   position: fixed;
   right: 24px;
@@ -480,7 +526,8 @@ code {
   .facts,
   .facts.compact,
   .agent-result dl,
-  .review-list {
+  .review-list,
+  .runbook-grid {
     grid-template-columns: 1fr;
   }
 }

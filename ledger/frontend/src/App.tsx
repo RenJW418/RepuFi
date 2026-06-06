@@ -82,8 +82,38 @@ type IntakeDecision = {
   analysis: GoalAnalysis;
   predicate?: DemoPredicate;
 };
+type DemoRunbookStep = {
+  id: DemoScenarioTemplate["id"];
+  marker: string;
+  betSide: Side;
+  resolution: "Oracle agrees" | "Escalate review";
+  voter: string;
+};
 
 const METADATA_KEY = "repufi.demoPactMetadata.v1";
+const demoRunbook: DemoRunbookStep[] = [
+  {
+    id: "l1-habit",
+    marker: "l1-intake",
+    betSide: Side.Commit,
+    resolution: "Oracle agrees",
+    voter: "Local verifier settles Kept"
+  },
+  {
+    id: "l2-delivery",
+    marker: "l2-market",
+    betSide: Side.Skeptic,
+    resolution: "Oracle agrees",
+    voter: "Local verifier settles Breached"
+  },
+  {
+    id: "l3-policy",
+    marker: "l3-review",
+    betSide: Side.Skeptic,
+    resolution: "Escalate review",
+    voter: "Local owner + Local REPU reviewer vote Breached"
+  }
+];
 
 function short(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -679,6 +709,33 @@ function App() {
               <div><dt>Staked kept</dt><dd>{eth(profile.stakedKept)} ETH</dd></div>
             </dl>
           ) : null}
+        </div>
+
+        <div className="panel runbook">
+          <div className="panel-title">
+            <BadgeCheck size={18} />
+            <h2>Demo runbook</h2>
+          </div>
+          <div className="runbook-grid">
+            {demoRunbook.map((step) => {
+              const scenario = scenarioById(step.id);
+              return (
+                <article key={step.id} data-demo-marker={step.marker}>
+                  <header>
+                    <span>{scenario.tier}</span>
+                    <strong>{scenario.title}</strong>
+                  </header>
+                  <dl>
+                    <div><dt>Goal intake</dt><dd>Local subject publishes {scenario.defaultStakeEth} ETH after Brain approval</dd></div>
+                    <div><dt>Plaza filter</dt><dd>{scenario.category}</dd></div>
+                    <div><dt>Market action</dt><dd>{SIDES[step.betSide]} with Local {SIDES[step.betSide]} bettor</dd></div>
+                    <div><dt>Resolution</dt><dd>{step.resolution}</dd></div>
+                    <div><dt>Review</dt><dd>{step.voter}</dd></div>
+                  </dl>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 
