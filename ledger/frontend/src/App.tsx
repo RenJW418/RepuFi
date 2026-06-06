@@ -31,6 +31,7 @@ import {
 import { Outcome, PredType, Side, type Hex } from "../../shared/schemas";
 import {
   demoWalletRoles,
+  getLocalVerifierSigner,
   getReadContracts,
   getWriteContracts,
   loadPactCreated,
@@ -379,10 +380,11 @@ function App() {
 
   async function submitDemoVerdict() {
     if (!selectedId) return;
-    const { resolver, signer } = await getWriteContracts(walletRole);
+    const { resolver } = await getWriteContracts(walletRole);
+    const verifierSigner = await getLocalVerifierSigner();
     const evidenceHash = id(`${selectedId}:${selectedScenario.id}:${resolutionMode}:${outcomeLabel(resolution.finalOutcome)}`);
     const digest = await resolver.verdictDigest(selectedId, resolution.oracleOutcome, evidenceHash);
-    const sig = await signer.signMessage(getBytes(digest));
+    const sig = await verifierSigner.signMessage(getBytes(digest));
     const tx =
       resolution.needsHumanReview
         ? await resolver.submitDisputedVerdict(

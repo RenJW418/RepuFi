@@ -9,6 +9,7 @@ export const rpcUrl = import.meta.env.VITE_RPC_URL ?? "http://127.0.0.1:8545";
 
 export const demoWalletRoles = [
   { id: "browser", label: "Browser wallet", accountIndex: undefined },
+  { id: "verifier", label: "Local verifier", accountIndex: 1 },
   { id: "subject", label: "Local subject", accountIndex: 2 },
   { id: "commit", label: "Local Commit bettor", accountIndex: 3 },
   { id: "skeptic", label: "Local Skeptic bettor", accountIndex: 4 },
@@ -87,6 +88,10 @@ export async function getWriteContracts(roleId: DemoWalletRoleId = "browser") {
     credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, signer),
     reviewToken: new Contract(addresses.RepuToken, repuTokenAbi, signer)
   };
+}
+
+export async function getLocalVerifierSigner(): Promise<Signer> {
+  return readProvider().getSigner(1);
 }
 
 async function signerForRole(role: (typeof demoWalletRoles)[number]): Promise<Signer> {
