@@ -317,12 +317,32 @@ function App() {
     if (!selectedId) return;
     const { resolver, signer } = await getWriteContracts();
     const evidenceHash = id(`${selectedId}:${selectedScenario.id}:${resolutionMode}:${outcomeLabel(resolution.finalOutcome)}`);
-    const digest = await resolver.verdictDigest(selectedId, resolution.finalOutcome, evidenceHash);
+    const digest = await resolver.verdictDigest(selectedId, resolution.oracleOutcome, evidenceHash);
     const sig = await signer.signMessage(getBytes(digest));
-    const tx = await resolver.submitVerdict(selectedId, resolution.finalOutcome, evidenceHash, sig);
-    setMessage("Verifier verdict pending...");
+    const tx =
+      resolution.needsHumanReview
+        ? await resolver.submitDisputedVerdict(
+            selectedId,
+            resolution.oracleOutcome,
+            resolution.agentConsensus,
+            evidenceHash,
+            sig
+          )
+        : await resolver.submitVerdict(selectedId, resolution.finalOutcome, evidenceHash, sig);
+    setMessage(resolution.needsHumanReview ? "Opening token-holder review..." : "Verifier verdict pending...");
     await tx.wait();
-    setMessage("Verifier verdict settled on-chain");
+    setMessage(resolution.needsHumanReview ? "Review opened on-chain" : "Verifier verdict settled on-chain");
+    await refresh();
+    await refreshProfile();
+  }
+
+  async function voteReview(outcome: Outcome.Kept | Outcome.Breached) {
+    if (!selectedId) return;
+    const { resolver } = await getWriteContracts();
+    const tx = await resolver.voteReview(selectedId, outcome);
+    setMessage(`Review vote pending: ${outcomeLabel(outcome)}`);
+    await tx.wait();
+    setMessage(`Review vote cast: ${outcomeLabel(outcome)}`);
     await refresh();
     await refreshProfile();
   }
@@ -548,8 +568,20 @@ function App() {
           </div>
           <button className="wide" onClick={submitDemoVerdict} disabled={!selected || Boolean(selected.settled)}>
             <ShieldCheck size={16} />
-            Submit verifier verdict
+            {resolution.needsHumanReview ? "Open on-chain review" : "Submit verifier verdict"}
           </button>
+          {resolution.needsHumanReview ? (
+            <div className="actions">
+              <button onClick={() => voteReview(Outcome.Breached)} disabled={!selected || Boolean(selected.settled)}>
+                <Vote size={16} />
+                Vote Breached
+              </button>
+              <button onClick={() => voteReview(Outcome.Kept)} disabled={!selected || Boolean(selected.settled)}>
+                <Vote size={16} />
+                Vote Kept
+              </button>
+            </div>
+          ) : null}
           <p className="muted">{resolution.distribution.winnerReceives} {resolution.distribution.protocolBuckets}</p>
         </div>
 

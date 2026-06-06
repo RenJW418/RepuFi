@@ -12,9 +12,10 @@ The Ledger module implements chain-hosted commitment markets, parimutuel pools, 
 - `ledger/contracts/PactMarket.sol`: 合约生成 `pactId` 和 `predicateHash`，支持立约、Commit/Skeptic 下注、违约概率定价、结算、领奖。
 - `ledger/contracts/CredibilitySBT.sol`: 每个 subject 一份不可转移信誉档案，守约按 `bond * difficulty` 加分，违约扣分并累计永久污点。
 - `ledger/contracts/Resolver.sol`: 支持授权 verifier 的 EIP-191 签名裁决，也支持 `selfResolve` 走自验证 adapter。
+- `ledger/contracts/Resolver.sol`: 当 oracle 结果和多 Agent consensus 不一致时，可开启链上 token-holder review；发起人、市场参与者、关联方会被合约拒绝投票。
 - `ledger/contracts/adapters/OnchainMilestoneAdapter.sol`: MVP 自验证谓词，判断目标地址是否已部署合约。
 - `ledger/shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
-- `ledger/shared/demoWorkflow.ts`: 三类 demo case 的目标审查、predicate 编译、分类、UMA/多 Agent/人工复核状态机。
+- `ledger/shared/demoWorkflow.ts`: 三类 demo case 的目标审查、predicate 编译、分类、UMA/多 Agent/人工复核展示模型。
 - `ledger/frontend/`: 从目标输入、Agent 审查、发布广场、分类筛选、下注、裁决、领取到信誉档案的演示工作台。
 - `ledger/scripts/seedDemo.ts`: 不依赖 Brain，直接跑守约/违约两条路径。
 - `ledger/scripts/demoScenarios.ts`: 三类 MD 场景的链上 smoke，逐个创建、下注、签名裁决、领奖。
@@ -72,8 +73,9 @@ npm run frontend:dev
 - `Goal intake`: 用户选择三类 case，输入目标和质押金额；Agent 只接受可量化、到期可判断、有客观证据路径的目标。
 - `Plaza`: 事件发布后进入广场，可按 `Personal Discipline`、`Project Delivery`、`Public Accountability` 筛选。
 - `Market detail`: 用户进入事件后选择 Commit/Skeptic 和金额，通过钱包下注。
-- `Resolution demo`: 参考 Polymarket/UMA 乐观预言机：oracle proposal、challenge window；当多 Agent consensus 与 oracle 不一致时，进入 token-holder review，并排除发起人、市场参与者、关联方。
-- `Submit verifier verdict`: 用本地部署的授权 verifier 钱包签名提交裁决，最终走 `Resolver.submitVerdict` 上链结算。
+- `Resolution demo`: 参考 Polymarket/UMA 乐观预言机：oracle proposal、challenge window；当多 Agent consensus 与 oracle 不一致时，调用 `Resolver.submitDisputedVerdict` 开启链上 token-holder review。
+- `Vote review`: 非参与者/非发起人/非关联方的钱包可调用 `Resolver.voteReview`；发起人、Commit/Skeptic 参与者、关联方会被合约拒绝。
+- `Submit verifier verdict`: oracle 和 Agent 一致时，用本地部署的授权 verifier 钱包签名提交裁决，最终走 `Resolver.submitVerdict` 上链结算。
 - `Claim` 和 `Credibility`: 赢家领取收益，subject 的 CredibilitySBT 档案更新。
 
 4. 无浏览器 smoke：
@@ -83,9 +85,9 @@ npm run ledger:demo:scenarios
 npm run brain:scenarios
 ```
 
-`ledger:demo:scenarios` 证明 L1/L2/L3 都能在合约上创建、下注、授权签名裁决、领取；`brain:scenarios` 证明 L1/L2/L3 的 kept/breach 六条 Brain mock 路径都能编译 predicate、下注、验真、签名、结算。
+`ledger:demo:scenarios` 证明 L1/L2/L3 都能在合约上创建、下注、裁决、领取；其中 L3 走 oracle/Agent 分歧后的链上 token-holder review 再结算。`brain:scenarios` 证明 L1/L2/L3 的 kept/breach 六条 Brain mock 路径都能编译 predicate、下注、验真、签名、结算。
 
-当前 demo 没有接真实 UMA 主网/测试网；网页状态机按官方 Polymarket/UMA 文档映射乐观预言机、争议升级和代币持有人投票流程，链上资金结算仍由本地 `Resolver` 的授权签名口径执行。
+当前 demo 没有接真实 UMA 主网/测试网；网页和 `Resolver` 按官方 Polymarket/UMA 文档映射乐观预言机、争议升级和代币持有人投票流程，本地链用授权 verifier 打开裁决或争议，再由 `Resolver` 完成资金结算。
 
 ## 关键接口
 

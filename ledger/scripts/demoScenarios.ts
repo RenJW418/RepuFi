@@ -23,7 +23,7 @@ async function createPact(subject: any, market: any, scenario: (typeof demoScena
 }
 
 async function main() {
-  const [owner, verifier, subject, commit, skeptic, insurance, community] = await ethers.getSigners();
+  const [owner, verifier, subject, commit, skeptic, insurance, community, reviewer] = await ethers.getSigners();
 
   const credibility = await ethers.deployContract("CredibilitySBT", [owner.address]);
   const market = await ethers.deployContract("PactMarket", [owner.address, await credibility.getAddress()]);
@@ -44,13 +44,20 @@ async function main() {
     await (await market.connect(commit).takePosition(pact.id, Side.Commit, { value: ethers.parseEther("0.5") })).wait();
     await (await market.connect(skeptic).takePosition(pact.id, Side.Skeptic, { value: ethers.parseEther("0.5") })).wait();
 
-    const outcome = index === 1 ? Outcome.Breached : Outcome.Kept;
-    const evidenceHash = ethers.id(`${scenario.id}:${outcome}`);
-    const digest = await resolver.verdictDigest(pact.id, outcome, evidenceHash);
+    const directOutcome = index === 1 ? Outcome.Breached : Outcome.Kept;
+    const finalOutcome = scenario.id === "l3-policy" ? Outcome.Breached : directOutcome;
+    const evidenceHash = ethers.id(`${scenario.id}:${finalOutcome}`);
+    const digest = await resolver.verdictDigest(pact.id, directOutcome, evidenceHash);
     const sig = await verifier.signMessage(ethers.getBytes(digest));
-    await (await resolver.submitVerdict(pact.id, outcome, evidenceHash, sig)).wait();
+    if (scenario.id === "l3-policy") {
+      await (await resolver.submitDisputedVerdict(pact.id, Outcome.Kept, Outcome.Breached, evidenceHash, sig)).wait();
+      await (await resolver.connect(owner).voteReview(pact.id, Outcome.Breached)).wait();
+      await (await resolver.connect(reviewer).voteReview(pact.id, Outcome.Breached)).wait();
+    } else {
+      await (await resolver.submitVerdict(pact.id, directOutcome, evidenceHash, sig)).wait();
+    }
 
-    const winner = outcome === Outcome.Kept ? commit : skeptic;
+    const winner = finalOutcome === Outcome.Kept ? commit : skeptic;
     await (await market.connect(winner).claim(pact.id)).wait();
     const stored = await market.getPact(pact.id);
     const profile = await credibility.profileOf(subject.address);
@@ -59,9 +66,10 @@ async function main() {
       id: scenario.id,
       title: scenario.title,
       predType: pact.predicate.predType,
-      outcome: outcome === Outcome.Kept ? "Kept" : "Breached",
+      outcome: finalOutcome === Outcome.Kept ? "Kept" : "Breached",
       settled: stored.settled,
-      winner: outcome === Outcome.Kept ? "Commit" : "Skeptic",
+      reviewPath: scenario.id === "l3-policy",
+      winner: finalOutcome === Outcome.Kept ? "Commit" : "Skeptic",
       profile: {
         kept: Number(profile.kept),
         broken: Number(profile.broken),
