@@ -140,6 +140,7 @@ function App() {
   const [breachProb, setBreachProb] = useState<bigint>(0n);
   const [profileAddress, setProfileAddress] = useState("");
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [reviewTokenBalance, setReviewTokenBalance] = useState<bigint>(0n);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [message, setMessage] = useState("");
   const [scenarioId, setScenarioId] = useState(demoScenarioTemplates[0].id);
@@ -223,6 +224,12 @@ function App() {
     setProfile(value as Profile);
   }
 
+  async function refreshReviewToken(addr = account) {
+    if (!addr) return;
+    const { reviewToken } = getReadContracts();
+    setReviewTokenBalance(await reviewToken.balanceOf(addr));
+  }
+
   useEffect(() => {
     refresh().catch((error) => setMessage(error.message));
     const interval = window.setInterval(() => {
@@ -254,6 +261,7 @@ function App() {
     const contracts = await getWriteContracts();
     setAccount(contracts.account);
     setProfileAddress(contracts.account);
+    setReviewTokenBalance(await contracts.reviewToken.balanceOf(contracts.account));
     setMessage(`Connected ${short(contracts.account)}`);
   }
 
@@ -345,6 +353,7 @@ function App() {
     setMessage(`Review vote cast: ${outcomeLabel(outcome)}`);
     await refresh();
     await refreshProfile();
+    await refreshReviewToken();
   }
 
   async function claim() {
@@ -549,6 +558,7 @@ function App() {
             <div><dt>Agent consensus</dt><dd>{outcomeLabel(resolution.agentConsensus)}</dd></div>
             <div><dt>Final</dt><dd>{outcomeLabel(resolution.finalOutcome)}</dd></div>
             <div><dt>Winner side</dt><dd>{SIDES[resolution.distribution.winnerSide]}</dd></div>
+            <div><dt>REPU balance</dt><dd>{account ? eth(reviewTokenBalance) : "Connect"}</dd></div>
           </dl>
           <ol className="timeline">
             {resolution.timeline.map((step) => (

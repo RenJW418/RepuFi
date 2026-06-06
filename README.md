@@ -13,6 +13,7 @@ The Ledger module implements chain-hosted commitment markets, parimutuel pools, 
 - `ledger/contracts/CredibilitySBT.sol`: 每个 subject 一份不可转移信誉档案，守约按 `bond * difficulty` 加分，违约扣分并累计永久污点。
 - `ledger/contracts/Resolver.sol`: 支持授权 verifier 的 EIP-191 签名裁决，也支持 `selfResolve` 走自验证 adapter。
 - `ledger/contracts/Resolver.sol`: 当 oracle 结果和多 Agent consensus 不一致时，可开启链上 token-holder review；发起人、市场参与者、关联方会被合约拒绝投票。
+- `ledger/contracts/RepuToken.sol`: 本地 demo 用的 REPU review token；`Resolver.voteReview` 要求投票钱包持有 REPU。
 - `ledger/contracts/adapters/OnchainMilestoneAdapter.sol`: MVP 自验证谓词，判断目标地址是否已部署合约。
 - `ledger/shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
 - `ledger/shared/demoWorkflow.ts`: 三类 demo case 的目标审查、predicate 编译、分类、UMA/多 Agent/人工复核展示模型。
@@ -74,7 +75,7 @@ npm run frontend:dev
 - `Plaza`: 事件发布后进入广场，可按 `Personal Discipline`、`Project Delivery`、`Public Accountability` 筛选。
 - `Market detail`: 用户进入事件后选择 Commit/Skeptic 和金额，通过钱包下注。
 - `Resolution demo`: 参考 Polymarket/UMA 乐观预言机：oracle proposal、challenge window；当多 Agent consensus 与 oracle 不一致时，调用 `Resolver.submitDisputedVerdict` 开启链上 token-holder review。
-- `Vote review`: 非参与者/非发起人/非关联方的钱包可调用 `Resolver.voteReview`；发起人、Commit/Skeptic 参与者、关联方会被合约拒绝。
+- `Vote review`: 持有 REPU 且非参与者/非发起人/非关联方的钱包可调用 `Resolver.voteReview`；无 REPU、发起人、Commit/Skeptic 参与者、关联方会被合约拒绝。部署脚本会给本地 Hardhat `reviewer` 钱包铸 100 REPU。
 - `Submit verifier verdict`: oracle 和 Agent 一致时，用本地部署的授权 verifier 钱包签名提交裁决，最终走 `Resolver.submitVerdict` 上链结算。
 - `Claim` 和 `Credibility`: 赢家领取收益，subject 的 CredibilitySBT 档案更新。
 

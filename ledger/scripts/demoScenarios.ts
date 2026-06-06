@@ -28,15 +28,19 @@ async function main() {
   const credibility = await ethers.deployContract("CredibilitySBT", [owner.address]);
   const market = await ethers.deployContract("PactMarket", [owner.address, await credibility.getAddress()]);
   const resolver = await ethers.deployContract("Resolver", [owner.address, await market.getAddress()]);
+  const reviewToken = await ethers.deployContract("RepuToken", [owner.address]);
 
   await credibility.waitForDeployment();
   await market.waitForDeployment();
   await resolver.waitForDeployment();
+  await reviewToken.waitForDeployment();
 
   await (await credibility.setMarket(await market.getAddress())).wait();
   await (await market.setResolver(await resolver.getAddress())).wait();
   await (await market.setTreasuries(insurance.address, community.address)).wait();
   await (await resolver.setVerifier(verifier.address, true)).wait();
+  await (await resolver.setReviewToken(await reviewToken.getAddress())).wait();
+  await (await reviewToken.mint(reviewer.address, ethers.parseEther("100"))).wait();
 
   const results = [];
   for (const [index, scenario] of demoScenarioTemplates.entries()) {

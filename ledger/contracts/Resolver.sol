@@ -7,11 +7,16 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {PactMarket} from "./PactMarket.sol";
 import {IPredicateAdapter} from "./interfaces/IPredicateAdapter.sol";
 
+interface IReviewToken {
+    function balanceOf(address account) external view returns (uint256);
+}
+
 contract Resolver is Ownable {
     using ECDSA for bytes32;
 
     PactMarket public immutable market;
 
+    IReviewToken public reviewToken;
     mapping(address => bool) public isVerifier;
     mapping(uint8 => address) public adapterOf;
     uint256 public reviewThreshold = 2;
@@ -31,6 +36,7 @@ contract Resolver is Ownable {
 
     event VerifierSet(address indexed verifier, bool allowed);
     event AdapterSet(uint8 indexed predType, address indexed adapter);
+    event ReviewTokenSet(address indexed token);
     event ReviewThresholdSet(uint256 threshold);
     event RelatedPartySet(bytes32 indexed id, address indexed account, bool related);
     event VerdictSubmitted(bytes32 indexed id, PactMarket.Outcome outcome, bytes32 evidenceHash, address verifier);
@@ -61,6 +67,7 @@ contract Resolver is Ownable {
     error ReviewAlreadyOpen();
     error ReviewNotOpen();
     error ConflictedVoter();
+    error NotTokenHolder();
     error AlreadyVoted();
 
     constructor(address initialOwner, address market_) Ownable(initialOwner) {
@@ -75,6 +82,11 @@ contract Resolver is Ownable {
     function setAdapter(uint8 predType, address adapter) external onlyOwner {
         adapterOf[predType] = adapter;
         emit AdapterSet(predType, adapter);
+    }
+
+    function setReviewToken(address token) external onlyOwner {
+        reviewToken = IReviewToken(token);
+        emit ReviewTokenSet(token);
     }
 
     function setReviewThreshold(uint256 threshold) external onlyOwner {
@@ -152,6 +164,7 @@ contract Resolver is Ownable {
         if (!review.open) revert ReviewNotOpen();
         if (hasReviewVoted[id][msg.sender]) revert AlreadyVoted();
         if (_isConflicted(id, msg.sender)) revert ConflictedVoter();
+        if (address(reviewToken) != address(0) && reviewToken.balanceOf(msg.sender) == 0) revert NotTokenHolder();
 
         hasReviewVoted[id][msg.sender] = true;
         if (outcome == PactMarket.Outcome.Kept) {

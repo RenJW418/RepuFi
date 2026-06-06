@@ -74,6 +74,11 @@
   },
   {
     "inputs": [],
+    "name": "NotTokenHolder",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "OracleAgentAgree",
     "type": "error"
   },
@@ -254,6 +259,19 @@
       }
     ],
     "name": "ReviewThresholdSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "ReviewTokenSet",
     "type": "event"
   },
   {
@@ -541,6 +559,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "reviewToken",
+    "outputs": [
+      {
+        "internalType": "contract IReviewToken",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -657,6 +688,19 @@
       }
     ],
     "name": "setReviewThreshold",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "setReviewToken",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

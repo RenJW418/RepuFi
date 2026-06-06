@@ -3,6 +3,7 @@ import addresses from "../../shared/addresses.json";
 import credibilityAbi from "../../shared/abis/CredibilitySBT.json";
 import marketAbi from "../../shared/abis/PactMarket.json";
 import resolverAbi from "../../shared/abis/Resolver.json";
+import repuTokenAbi from "../../shared/abis/RepuToken.json";
 
 export const rpcUrl = import.meta.env.VITE_RPC_URL ?? "http://127.0.0.1:8545";
 
@@ -58,7 +59,8 @@ export function getReadContracts(provider: ContractRunner = readProvider()) {
   return {
     market: new Contract(addresses.PactMarket, marketAbi, provider),
     resolver: new Contract(addresses.Resolver, resolverAbi, provider),
-    credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, provider)
+    credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, provider),
+    reviewToken: new Contract(addresses.RepuToken, repuTokenAbi, provider)
   };
 }
 
@@ -70,7 +72,8 @@ export async function getWriteContracts() {
     signer,
     market: new Contract(addresses.PactMarket, marketAbi, signer),
     resolver: new Contract(addresses.Resolver, resolverAbi, signer),
-    credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, signer)
+    credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, signer),
+    reviewToken: new Contract(addresses.RepuToken, repuTokenAbi, signer)
   };
 }
 
