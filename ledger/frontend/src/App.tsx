@@ -29,7 +29,18 @@ import {
   type ScenarioCategory
 } from "../../shared/demoWorkflow";
 import { Outcome, PredType, Side, type Hex } from "../../shared/schemas";
-import { getReadContracts, getWriteContracts, loadPactCreated, loadPriceHistory, Pact, PactRow, PricePoint, rpcUrl } from "./contracts";
+import {
+  demoWalletRoles,
+  getReadContracts,
+  getWriteContracts,
+  loadPactCreated,
+  loadPriceHistory,
+  Pact,
+  PactRow,
+  PricePoint,
+  rpcUrl,
+  type DemoWalletRoleId
+} from "./contracts";
 import "./styles.css";
 
 const OUTCOMES = ["Pending", "Kept", "Breached"];
@@ -158,6 +169,7 @@ async function requestGoalIntake(input: {
 
 function App() {
   const [account, setAccount] = useState("");
+  const [walletRole, setWalletRole] = useState<DemoWalletRoleId>("browser");
   const [rows, setRows] = useState<PactRow[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [selected, setSelected] = useState<Pact | null>(null);
@@ -301,11 +313,11 @@ function App() {
   }
 
   async function connect() {
-    const contracts = await getWriteContracts();
+    const contracts = await getWriteContracts(walletRole);
     setAccount(contracts.account);
     setProfileAddress(contracts.account);
     setReviewTokenBalance(await contracts.reviewToken.balanceOf(contracts.account));
-    setMessage(`Connected ${short(contracts.account)}`);
+    setMessage(`Connected ${contracts.label}: ${short(contracts.account)}`);
   }
 
   async function createPact() {
@@ -317,7 +329,7 @@ function App() {
       return;
     }
 
-    const { market } = await getWriteContracts();
+    const { market } = await getWriteContracts(walletRole);
     const currentPredicate = decision.predicate;
     const deadline = Math.floor(Date.now() / 1000) + Number(deadlineMinutes) * 60;
     const tx = await market.createPact(currentPredicate.predType, currentPredicate.paramsBlob, BigInt(deadline), {
@@ -346,7 +358,7 @@ function App() {
 
   async function takePosition() {
     if (!selectedId) return;
-    const { market } = await getWriteContracts();
+    const { market } = await getWriteContracts(walletRole);
     const tx = await market.takePosition(selectedId, side, { value: parseEther(stake) });
     setMessage("Position pending...");
     await tx.wait();
@@ -356,7 +368,7 @@ function App() {
 
   async function selfResolve() {
     if (!selectedId || !selectedRow) return;
-    const { resolver } = await getWriteContracts();
+    const { resolver } = await getWriteContracts(walletRole);
     const tx = await resolver.selfResolve(selectedId, selectedRow.predType, selectedRow.paramsBlob);
     setMessage("Self-resolve pending...");
     await tx.wait();
@@ -367,7 +379,7 @@ function App() {
 
   async function submitDemoVerdict() {
     if (!selectedId) return;
-    const { resolver, signer } = await getWriteContracts();
+    const { resolver, signer } = await getWriteContracts(walletRole);
     const evidenceHash = id(`${selectedId}:${selectedScenario.id}:${resolutionMode}:${outcomeLabel(resolution.finalOutcome)}`);
     const digest = await resolver.verdictDigest(selectedId, resolution.oracleOutcome, evidenceHash);
     const sig = await signer.signMessage(getBytes(digest));
@@ -390,7 +402,7 @@ function App() {
 
   async function voteReview(outcome: Outcome.Kept | Outcome.Breached) {
     if (!selectedId) return;
-    const { resolver } = await getWriteContracts();
+    const { resolver } = await getWriteContracts(walletRole);
     const tx = await resolver.voteReview(selectedId, outcome);
     setMessage(`Review vote pending: ${outcomeLabel(outcome)}`);
     await tx.wait();
@@ -402,7 +414,7 @@ function App() {
 
   async function claim() {
     if (!selectedId) return;
-    const { market } = await getWriteContracts();
+    const { market } = await getWriteContracts(walletRole);
     const tx = await market.claim(selectedId);
     setMessage("Claim pending...");
     await tx.wait();
@@ -419,6 +431,13 @@ function App() {
         </div>
         <div className="topbar-actions">
           <span className="rpc">RPC {rpcUrl}</span>
+          <select className="wallet-select" value={walletRole} onChange={(event) => setWalletRole(event.target.value as DemoWalletRoleId)}>
+            {demoWalletRoles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.label}
+              </option>
+            ))}
+          </select>
           <button className="icon-button" onClick={refresh} title="Refresh">
             <RefreshCcw size={18} />
           </button>

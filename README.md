@@ -84,6 +84,7 @@ npm run frontend:dev
 网页第一屏就是工作台：
 
 - `Goal intake`: 用户选择三类 case，输入目标和质押金额；网页调用 Brain 后台 Agent 审查，Agent 只接受可量化、到期可判断、有客观证据路径的目标，并把通过的 predicate 返回给钱包发布流程。
+- `Wallet`: 顶栏可连接真实浏览器钱包，也可直接选择 Hardhat 本地 demo 钱包：`Local subject` 发布事件，`Local Commit bettor` / `Local Skeptic bettor` 下注，`Local REPU reviewer` 持有 REPU 且未参与市场，可演示人工复核投票。
 - `Plaza`: 事件发布后进入广场，可按 `Personal Discipline`、`Project Delivery`、`Public Accountability` 筛选。
 - `Market detail`: 用户进入事件后选择 Commit/Skeptic 和金额，通过钱包下注。
 - `Resolution demo`: 参考 Polymarket/UMA 乐观预言机：oracle proposal、challenge window；当多 Agent consensus 与 oracle 不一致时，调用 `Resolver.submitDisputedVerdict` 开启链上 token-holder review。

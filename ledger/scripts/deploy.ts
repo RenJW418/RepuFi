@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { artifacts, ethers } from "hardhat";
 
 async function main() {
-  const [deployer, verifier, insurance, community, reviewer] = await ethers.getSigners();
+  const [deployer, verifier, , , , insurance, community, reviewer] = await ethers.getSigners();
 
   const credibility = await ethers.deployContract("CredibilitySBT", [deployer.address]);
   await credibility.waitForDeployment();

@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider, type ContractRunner } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, type ContractRunner, type Signer } from "ethers";
 import addresses from "../../shared/addresses.json";
 import credibilityAbi from "../../shared/abis/CredibilitySBT.json";
 import marketAbi from "../../shared/abis/PactMarket.json";
@@ -6,6 +6,17 @@ import resolverAbi from "../../shared/abis/Resolver.json";
 import repuTokenAbi from "../../shared/abis/RepuToken.json";
 
 export const rpcUrl = import.meta.env.VITE_RPC_URL ?? "http://127.0.0.1:8545";
+
+export const demoWalletRoles = [
+  { id: "browser", label: "Browser wallet", accountIndex: undefined },
+  { id: "subject", label: "Local subject", accountIndex: 2 },
+  { id: "commit", label: "Local Commit bettor", accountIndex: 3 },
+  { id: "skeptic", label: "Local Skeptic bettor", accountIndex: 4 },
+  { id: "reviewer", label: "Local REPU reviewer", accountIndex: 7 },
+  { id: "owner", label: "Local owner", accountIndex: 0 }
+] as const;
+
+export type DemoWalletRoleId = (typeof demoWalletRoles)[number]["id"];
 
 export type Pact = {
   subject: string;
@@ -64,17 +75,28 @@ export function getReadContracts(provider: ContractRunner = readProvider()) {
   };
 }
 
-export async function getWriteContracts() {
-  const provider = await walletProvider();
-  const signer = await provider.getSigner();
+export async function getWriteContracts(roleId: DemoWalletRoleId = "browser") {
+  const role = demoWalletRoles.find((item) => item.id === roleId) ?? demoWalletRoles[0];
+  const signer = await signerForRole(role);
   return {
     account: await signer.getAddress(),
+    label: role.label,
     signer,
     market: new Contract(addresses.PactMarket, marketAbi, signer),
     resolver: new Contract(addresses.Resolver, resolverAbi, signer),
     credibility: new Contract(addresses.CredibilitySBT, credibilityAbi, signer),
     reviewToken: new Contract(addresses.RepuToken, repuTokenAbi, signer)
   };
+}
+
+async function signerForRole(role: (typeof demoWalletRoles)[number]): Promise<Signer> {
+  if (role.id === "browser") {
+    const provider = await walletProvider();
+    return provider.getSigner();
+  }
+
+  const provider = readProvider();
+  return provider.getSigner(role.accountIndex);
 }
 
 export async function loadPactCreated(): Promise<PactRow[]> {
