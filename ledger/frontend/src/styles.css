@@ -53,6 +53,7 @@ body {
   overflow-x: hidden;
   color: var(--ink);
   background: var(--bg);
+  animation: page-warm-in 520ms ease both;
 }
 
 button,
@@ -101,6 +102,7 @@ button {
 button:hover {
   border-color: #98a2b3;
   background: var(--surface-2);
+  transform: translateY(-1px);
 }
 
 button:active {
@@ -251,6 +253,7 @@ label {
   gap: 20px;
   min-height: 360px;
   padding: clamp(28px, 5vw, 56px);
+  animation: panel-rise 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .eyebrow {
@@ -297,6 +300,7 @@ label {
   align-content: space-between;
   gap: 22px;
   padding: 24px;
+  animation: panel-rise 720ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .hero-panel-head {
@@ -324,12 +328,23 @@ label {
 
 .risk-meter span,
 .bar span {
+  position: relative;
   display: block;
   height: 100%;
   min-width: 2px;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--ok), var(--warn), var(--bad));
   transition: width 500ms ease;
+}
+
+.risk-meter span::after,
+.bar span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent);
+  transform: translateX(-100%);
+  animation: meter-sweep 2.8s ease-in-out infinite;
 }
 
 .hero-metrics {
@@ -346,6 +361,18 @@ label {
   border-radius: var(--radius);
   background: var(--surface-2);
   padding: 12px;
+}
+
+.hero-metrics div {
+  animation: metric-pop 520ms ease both;
+}
+
+.hero-metrics div:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.hero-metrics div:nth-child(3) {
+  animation-delay: 180ms;
 }
 
 dt {
@@ -514,6 +541,8 @@ dd {
 .market-row:hover {
   border-color: var(--accent-line);
   background: #fffaf6;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(67, 38, 24, 0.08);
 }
 
 .market-row.active {
@@ -538,6 +567,7 @@ dd {
   padding: 10px 12px;
   font-size: 14px;
   line-height: 1.35;
+  animation: note-glow 2.8s ease-in-out infinite;
 }
 
 .sample-note svg {
@@ -550,6 +580,7 @@ dd {
 
 .sample-row:hover {
   transform: none;
+  box-shadow: none;
 }
 
 .market-rank {
@@ -666,6 +697,17 @@ dd {
   border-radius: 50%;
   background: var(--accent);
   transform: translate(-50%, 50%);
+  animation: point-pulse 2.2s ease-in-out infinite;
+}
+
+.sparkline i:nth-child(2n),
+.ghost-spark i:nth-child(2n) {
+  animation-delay: 220ms;
+}
+
+.sparkline i:nth-child(3n),
+.ghost-spark i:nth-child(3n) {
+  animation-delay: 420ms;
 }
 
 .trade-box {
@@ -843,6 +885,70 @@ dd {
   }
   100% {
     box-shadow: var(--shadow);
+  }
+}
+
+@keyframes page-warm-in {
+  from {
+    opacity: 0;
+    background-color: #fbf7f2;
+  }
+  to {
+    opacity: 1;
+    background-color: var(--bg);
+  }
+}
+
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes metric-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes meter-sweep {
+  0%,
+  35% {
+    transform: translateX(-100%);
+  }
+  70%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes point-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+  }
+  45% {
+    box-shadow: 0 0 0 5px rgba(217, 119, 87, 0.16);
+  }
+}
+
+@keyframes note-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(217, 119, 87, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.08);
   }
 }
 
