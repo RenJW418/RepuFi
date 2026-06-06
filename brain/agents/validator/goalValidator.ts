@@ -7,6 +7,8 @@ export interface GoalValidationResult {
   tier: Tier;
   reason: string;
   suggestions: string[];
+  /** LLM-generated rewrite of the goal if invalid (or an improved form if valid) */
+  rewrittenGoal?: string;
 }
 
 const QUANTIFIABLE_PATTERNS = [
@@ -96,6 +98,10 @@ export async function validateGoal(input: {
   const llmSuggestions = Array.isArray(response.suggestions)
     ? (response.suggestions as string[])
     : local.suggestions;
+  const rewrittenGoal =
+    typeof response.rewrittenGoal === "string" && response.rewrittenGoal.trim()
+      ? response.rewrittenGoal
+      : undefined;
 
   return {
     valid: local.valid && llmValid,
@@ -103,5 +109,6 @@ export async function validateGoal(input: {
     tier: input.tier,
     reason: llmReason,
     suggestions: llmSuggestions,
+    rewrittenGoal,
   };
 }

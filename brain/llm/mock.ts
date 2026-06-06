@@ -31,12 +31,14 @@ export function createMockLlm(): BrainLlm {
 
       if (request.task === "validate-goal") {
         const vague = /变得更|努力|尽量|争取/.test(request.goal);
+        const rewrittenGoal = vague
+          ? buildRewrittenGoal(request.goal, request.tier)
+          : undefined;
         return {
           valid: !vague,
-          reason: vague
-            ? "目标缺乏可量化指标"
-            : "目标包含可量化指标，可生成谓词",
-          suggestions: vague ? ["加入具体数字或截止日期"] : [],
+          reason: vague ? "目标缺乏可量化指标" : "目标包含可量化指标，可生成谓词",
+          suggestions: vague ? ["加入具体数字或截止日期", "说明可验证的证据来源"] : [],
+          rewrittenGoal,
         };
       }
 
@@ -94,4 +96,10 @@ function compilePredicateResponse(goal: string, tier: Tier): Record<string, unkn
 function inferRequiredDays(goal: string): number {
   const match = goal.match(/(\d+)\s*天/);
   return match ? Number(match[1]) : 30;
+}
+
+function buildRewrittenGoal(goal: string, tier: string): string {
+  if (tier === "L1") return `30天内完成 ${goal.slice(0, 8)} 相关行动，每天打卡记录，共计 30 次`;
+  if (tier === "L2") return `Q3结束前完成 ${goal.slice(0, 10)} 并在链上公布可验证合约地址`;
+  return `任期内将 ${goal.slice(0, 10)} 相关指标从当前基准提升 10%，以政府公开数据为准`;
 }

@@ -20,9 +20,11 @@ import {
   getWriteContracts,
   loadPactCreated,
   loadPriceHistory,
+  loadReviewVoters,
   Pact,
   PactRow,
-  PricePoint
+  PricePoint,
+  ReviewVoterRow
 } from "./contracts";
 import "./styles.css";
 
@@ -37,6 +39,7 @@ type BrainReview = {
   paramsBlob: string;
   paramsSummary: string;
   tier: string;
+  rewrittenGoal?: string;
 } | null;
 
 type Profile = {
@@ -144,6 +147,10 @@ function App() {
   const [brainReview, setBrainReview] = useState<BrainReview>(null);
   const [brainPending, setBrainPending] = useState(false);
 
+  // Resolution / ReviewVoters
+  const [reviewVoters, setReviewVoters] = useState<ReviewVoterRow[]>([]);
+  const [showResolution, setShowResolution] = useState(false);
+
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
   const activeQuest = selected ? (selected.outcome === 0n ? "Trading" : OUTCOMES[Number(selected.outcome)]) : "Scout";
@@ -220,6 +227,7 @@ function App() {
       });
       const data = await resp.json() as {
         accepted: boolean;
+        rewrittenGoal?: string;
         analysis: { reasons: string[]; tier: string };
         predicate?: { predType: number; paramsBlob: string; paramsSummary: string };
       };
@@ -230,9 +238,9 @@ function App() {
         predType: data.predicate?.predType ?? ONCHAIN_MILESTONE,
         paramsBlob: data.predicate?.paramsBlob ?? "",
         paramsSummary: data.predicate?.paramsSummary ?? "",
+        rewrittenGoal: data.rewrittenGoal,
       });
       if (data.accepted && data.predicate?.paramsBlob) {
-        // Auto-fill milestone target from Brain's compiled paramsBlob
         try {
           const { AbiCoder: AC } = await import("ethers");
           const decoded = AC.defaultAbiCoder().decode(["address"], data.predicate.paramsBlob);
@@ -242,9 +250,9 @@ function App() {
         }
         setMessage(`Brain approved: ${data.predicate.paramsSummary}`);
       } else {
-        setMessage(`Brain rejected: ${data.analysis.reasons.join("; ")}`);
+        setMessage(`Brain rejected — see suggestions below.`);
       }
-    } catch (err) {
+    } catch {
       setMessage(`Brain API unavailable — fill milestone target manually.`);
       setBrainReview(null);
     } finally {
@@ -288,6 +296,14 @@ function App() {
     setMessage("Market resolved.");
     await refresh();
     await refreshProfile();
+    // Load review voters (interest isolation) after resolution
+    try {
+      const voters = await loadReviewVoters(selectedId);
+      setReviewVoters(voters);
+      setShowResolution(true);
+    } catch {
+      setReviewVoters([]);
+    }
   }
 
   async function claim() {
@@ -450,6 +466,21 @@ function App() {
                   <>
                     <strong>✗ Goal rejected</strong>
                     <ul>{brainReview.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                    {brainReview.rewrittenGoal && (
+                      <div className="rewrite-suggestion">
+                        <span>Brain suggests:</span>
+                        <em>"{brainReview.rewrittenGoal}"</em>
+                        <button
+                          className="adopt-btn"
+                          onClick={() => {
+                            setGoalText(brainReview.rewrittenGoal!);
+                            setBrainReview(null);
+                          }}
+                        >
+                          Adopt suggestion
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -560,6 +591,46 @@ function App() {
                 <button onClick={selfResolve}><Flag size={16} /> Resolve</button>
                 <button onClick={claim}><BadgeCheck size={16} /> Claim</button>
               </div>
+
+              {/* Resolution pipeline: UMA OO → Multi-Agent → Human Review */}
+              {showResolution && (
+                <div className="resolution-panel">
+                  <div className="resolution-title">
+                    <ShieldCheck size={16} />
+                    <strong>Resolution Pipeline (UMA + Multi-Agent + Human Review)</strong>
+                  </div>
+                  <ol className="resolution-steps">
+                    <li>
+                      <strong>UMA Optimistic Oracle</strong>
+                      <span>Proposer posts outcome + bond (0.1 ETH). Liveness window opens.</span>
+                    </li>
+                    <li>
+                      <strong>Multi-Agent Cross-Check</strong>
+                      <span>3 independent Brain agents verify evidence. Majority overrides if they disagree with UMA.</span>
+                    </li>
+                    <li>
+                      <strong>Human Review (DVM)</strong>
+                      <span>Disputed outcomes go to token-holder vote. Interest isolation applied.</span>
+                    </li>
+                  </ol>
+                  {reviewVoters.length > 0 && (
+                    <div className="voters-section">
+                      <strong>Review Voter Eligibility ({reviewVoters.filter(v => v.eligible).length}/{reviewVoters.length} eligible)</strong>
+                      <div className="voters-list">
+                        {reviewVoters.map((v) => (
+                          <div key={v.address} className={`voter-row ${v.eligible ? "eligible" : "excluded"}`}>
+                            <span className="voter-addr">{short(v.address)}</span>
+                            <span className="voter-reason">{v.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <button className="wide" onClick={() => setShowResolution(false)}>
+                    <X size={14} /> Close
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="sample-detail">

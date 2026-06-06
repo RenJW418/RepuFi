@@ -562,6 +562,127 @@ dd {
   margin-bottom: 2px;
 }
 
+.rewrite-suggestion {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #7a4a1a;
+  border-radius: var(--radius);
+  background: rgba(122, 74, 26, 0.1);
+  font-size: 13px;
+  display: grid;
+  gap: 6px;
+}
+
+.rewrite-suggestion span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rewrite-suggestion em {
+  color: var(--ink);
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.adopt-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.resolution-panel {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.resolution-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-deep);
+  font-size: 13px;
+}
+
+.resolution-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.resolution-steps li {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.resolution-steps li strong {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
+
+.resolution-steps li span {
+  color: var(--muted);
+}
+
+.voters-section {
+  border-top: 1px solid var(--accent-line);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.voters-section > strong {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.voters-list {
+  display: grid;
+  gap: 4px;
+}
+
+.voter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.voter-row.eligible {
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.voter-row.excluded {
+  background: rgba(194, 65, 50, 0.08);
+  border: 1px solid rgba(194, 65, 50, 0.2);
+}
+
+.voter-addr {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.voter-reason {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 
 .market-row {
   display: grid;

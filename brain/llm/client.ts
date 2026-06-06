@@ -14,10 +14,11 @@ Output compact JSON ONLY (no markdown, no explanation):
   "validate-goal": `You are a PACT Brain goal validator. Assess whether a commitment goal is quantifiable and verifiable.
 
 Output compact JSON ONLY:
-{"valid":<true|false>,"reason":"<one sentence>","suggestions":["<if invalid, 1-3 concrete suggestions>"]}
+{"valid":<true|false>,"reason":"<one sentence>","suggestions":["<if invalid, 1-3 concrete suggestions>"],"rewrittenGoal":"<improved quantifiable version of the goal, always provided>"}
 
 A goal is VALID if it has: (1) a measurable quantity, (2) a clear deadline, (3) an objective evidence path.
-A goal is INVALID if it is vague, lacks numbers, or has no verifiable evidence.`,
+A goal is INVALID if it is vague, lacks numbers, or has no verifiable evidence.
+ALWAYS provide rewrittenGoal — an improved, quantifiable version the user can choose to adopt.`,
 
   "verify-habit": `You are a PACT Brain habit verifier. Evaluate check-in evidence for an L1 habit commitment.
 
