@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BadgeCheck,
@@ -7,12 +7,11 @@ import {
   RefreshCcw,
   Scale,
   ShieldCheck,
-  Sparkles,
   Target,
-  TerminalSquare,
   Trophy,
   UserRound,
-  Wallet
+  Wallet,
+  X
 } from "lucide-react";
 import { AbiCoder, ZeroAddress, formatEther, parseEther } from "ethers";
 import {
@@ -22,8 +21,7 @@ import {
   loadPriceHistory,
   Pact,
   PactRow,
-  PricePoint,
-  rpcUrl
+  PricePoint
 } from "./contracts";
 import "./styles.css";
 
@@ -64,6 +62,49 @@ function outcomeClass(outcome?: bigint) {
   return "pending";
 }
 
+const SAMPLE_MARKETS = [
+  {
+    rank: "01",
+    title: "Will 0x7A3F...B92C ship the MVP demo?",
+    meta: "0x8c21...f4d0 target · 2.5 ETH bond",
+    odds: "38.75%"
+  },
+  {
+    rank: "02",
+    title: "Will 0xA114...09ED deploy milestone contract?",
+    meta: "0x41be...7a10 target · 1.8 ETH bond",
+    odds: "52.10%"
+  },
+  {
+    rank: "03",
+    title: "Will 0xC901...331A keep the launch pledge?",
+    meta: "0x693f...12c8 target · 4.0 ETH bond",
+    odds: "24.40%"
+  }
+];
+
+const SAMPLE_ODDS = [18, 28, 24, 37, 34, 44, 39, 52, 46, 38.75];
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`reveal ${inView ? "in" : ""} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 function App() {
   const [account, setAccount] = useState("");
   const [rows, setRows] = useState<PactRow[]>([]);
@@ -79,6 +120,12 @@ function App() {
   const [stake, setStake] = useState("1");
   const [side, setSide] = useState<0 | 1>(0);
   const [deadlineMinutes, setDeadlineMinutes] = useState("30");
+  const createRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const [flash, setFlash] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
@@ -192,18 +239,58 @@ function App() {
     await refresh();
   }
 
+  function focusPanel(ref: React.RefObject<HTMLDivElement>, key: string, inputId?: string) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlash(key);
+    window.setTimeout(() => setFlash(""), 1200);
+    if (inputId) window.setTimeout(() => document.getElementById(inputId)?.focus(), 350);
+  }
+
+  function openCreate() {
+    setShowCreate(true);
+    window.setTimeout(() => focusPanel(createRef, "create", "milestone-input"), 60);
+  }
+
+  const connected = Boolean(account);
+  const hasMarkets = rows.length > 0;
+  const isPending = selected?.outcome === 0n;
+  const isResolved = Boolean(selected && selected.outcome !== 0n);
+  const traded = selected ? selected.commitPool + selected.skepticPool > 0n : false;
+  const previewBreachProb = selected ? Number(breachProb) / 100 : 38.75;
+  const previewMarketCount = hasMarkets ? rows.length : SAMPLE_MARKETS.length;
+  const previewLiquidity = selected ? `${eth(totalLiquidity)} ETH` : "14.2 ETH";
+  const previewQuest = hasMarkets ? activeQuest : "Demo";
+
+  const guide = !connected
+    ? { n: 1, label: "Connect Wallet", hint: "Link a wallet to begin.", icon: <Wallet size={18} />, action: connect }
+    : !hasMarkets
+    ? { n: 2, label: "Create the First Pact", hint: "No markets yet — launch a commitment quest.", icon: <Target size={18} />, action: openCreate }
+    : !selected
+    ? { n: 2, label: "Pick a Market", hint: "Choose a quest from the board to trade.", icon: <Activity size={18} />, action: () => focusPanel(boardRef, "board") }
+    : isPending
+    ? { n: 3, label: "Stake a Position", hint: "Back Commit (kept) or Skeptic (breach).", icon: <CircleDollarSign size={18} />, action: () => focusPanel(detailRef, "detail") }
+    : { n: 4, label: "Resolve & Earn Credibility", hint: "Settle the pact and update the SBT.", icon: <Flag size={18} />, action: () => focusPanel(detailRef, "detail") };
+
+  const steps = [
+    { label: "Connect", done: connected },
+    { label: "Create / Stake", done: hasMarkets },
+    { label: "Trade Odds", done: traded },
+    { label: "Resolve", done: isResolved }
+  ];
+
   return (
     <main className="app">
-      <header className="topbar pixel-frame">
+      <header className="topbar">
         <div className="brand-lockup">
           <span className="brand-mark">RF</span>
           <div>
-            <h1>RepuFi Arcade</h1>
-            <p>On-chain commitment markets and credibility.</p>
+            <h1>RepuFi</h1>
+            <p>Commitment markets and credibility primitives</p>
           </div>
         </div>
         <div className="topbar-actions">
-          <span className="rpc"><TerminalSquare size={15} /> {rpcUrl}</span>
+          <button onClick={openCreate}><Target size={16} /> New Pact</button>
+          <button className={showProfile ? "toggle-on" : ""} onClick={() => setShowProfile((value) => !value)}><UserRound size={16} /> Credibility</button>
           <button className="icon-button" onClick={refresh} title="Refresh markets">
             <RefreshCcw size={18} />
           </button>
@@ -211,79 +298,95 @@ function App() {
         </div>
       </header>
 
-      <section className="score-strip">
-        <div className="score-tile">
-          <span>Markets</span>
-          <strong>{rows.length}</strong>
-        </div>
-        <div className="score-tile">
-          <span>Active Quest</span>
-          <strong>{activeQuest}</strong>
-        </div>
-        <div className="score-tile">
-          <span>Breach Odds</span>
-          <strong>{selected ? pct(breachProb) : "--"}</strong>
-        </div>
-        <div className="score-tile">
-          <span>Liquidity</span>
-          <strong>{selected ? `${eth(totalLiquidity)} ETH` : "--"}</strong>
-        </div>
-      </section>
-
-      <section className="quest-hero pixel-frame">
+      <Reveal className="hero">
         <div className="hero-copy">
-          <div className="mini-label"><Sparkles size={14} /> Demo route</div>
-          <h2>
-            <span>Launch pact.</span>
-            <span>Price risk.</span>
-            <span>Settle reputation.</span>
-          </h2>
-          <p>HackQuest-style missions with Polymarket-style odds, pools, and outcomes.</p>
+          <span className="eyebrow">Beijing ETH demo console</span>
+          <h2 className="hero-title">Price commitment risk with on-chain markets.</h2>
+          <p className="hero-sub">Create a pact, let Commit and Skeptic capital price the breach probability, then resolve outcomes into a credibility profile.</p>
+          <div className="hero-cta-row">
+            <button className="cta primary" onClick={guide.action}>{guide.icon} {guide.label}</button>
+            <button className="cta secondary" onClick={refresh}><RefreshCcw size={16} /> Refresh</button>
+          </div>
         </div>
-        <div className="quest-steps">
-          <span className="step done">1 Compile goal</span>
-          <span className="step done">2 Stake bond</span>
-          <span className={`step ${rows.length ? "done" : ""}`}>3 Trade odds</span>
-          <span className={`step ${selected?.outcome ? "done" : ""}`}>4 Resolve</span>
+        <div className="hero-panel">
+          <div className="hero-panel-head">
+            <span>{hasMarkets ? "Current market" : "Sample market"}</span>
+            <b>{previewQuest}</b>
+          </div>
+          <div className="risk-meter" aria-label="Breach probability">
+            <span style={{ width: `${previewBreachProb}%` }} />
+          </div>
+          <dl className="hero-metrics">
+            <div><dt>Markets</dt><dd>{previewMarketCount}</dd></div>
+            <div><dt>Breach odds</dt><dd>{selected ? pct(breachProb) : "38.75%"}</dd></div>
+            <div><dt>Liquidity</dt><dd>{previewLiquidity}</dd></div>
+          </dl>
+          <div className="stepper">
+            {steps.map((item, index) => (
+              <span key={item.label} className={`pip ${item.done ? "done" : ""} ${index === guide.n - 1 ? "active" : ""}`}>
+                <i />{item.label}
+              </span>
+            ))}
+          </div>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="grid">
-        <div className="panel create-panel pixel-frame">
-          <div className="panel-title">
-            <Scale size={18} />
-            <h2>Create Quest Market</h2>
-          </div>
-          <label>
-            Milestone target
-            <input value={target} onChange={(event) => setTarget(event.target.value)} />
-          </label>
-          <div className="split">
-            <label>
-              Bond ETH
-              <input value={bond} onChange={(event) => setBond(event.target.value)} />
-            </label>
-            <label>
-              Deadline min
-              <input value={deadlineMinutes} onChange={(event) => setDeadlineMinutes(event.target.value)} />
-            </label>
-          </div>
-          <button className="wide primary" onClick={createPact}><Target size={16} /> List Quest</button>
-          <div className="hint-box">
-            Subject stakes the bond. Commit backs delivery. Skeptic prices breach risk.
-          </div>
-        </div>
+      <div className="markets-zone">
+      <Reveal className="section-head">
+        <h2 className="section-title">Live Markets</h2>
+        <span className="section-sub">{guide.hint}</span>
+      </Reveal>
 
-        <div className="panel market-list pixel-frame">
+      <Reveal className={`grid ${showCreate ? "cols-3" : "cols-2"}`}>
+        {showCreate && (
+          <div className={`panel create-panel ${flash === "create" ? "flash" : ""}`} ref={createRef}>
+            <div className="panel-title">
+              <Scale size={18} />
+              <h2>Create Pact</h2>
+              <button className="icon-button close" onClick={() => setShowCreate(false)} title="Close"><X size={16} /></button>
+            </div>
+            <label>
+              Milestone target
+              <input id="milestone-input" value={target} onChange={(event) => setTarget(event.target.value)} />
+            </label>
+            <div className="split">
+              <label>
+                Bond ETH
+                <input value={bond} onChange={(event) => setBond(event.target.value)} />
+              </label>
+              <label>
+                Deadline min
+                <input value={deadlineMinutes} onChange={(event) => setDeadlineMinutes(event.target.value)} />
+              </label>
+            </div>
+            <button className="wide primary" onClick={createPact}><Target size={16} /> List Quest</button>
+            <div className="hint-box">
+              Subject stakes the bond. Commit backs delivery. Skeptic prices breach risk.
+            </div>
+          </div>
+        )}
+
+        <div className={`panel market-list ${flash === "board" ? "flash" : ""}`} ref={boardRef}>
           <div className="panel-title">
             <Activity size={18} />
             <h2>Market Board</h2>
           </div>
           {rows.length === 0 ? (
-            <div className="empty-state">
-              <Trophy size={24} />
-              <strong>No quests listed</strong>
-              <span>Start Hardhat, deploy contracts, or create the first pact.</span>
+            <div className="sample-list">
+              <div className="sample-note">
+                <Trophy size={18} />
+                Demo markets shown until local chain events are available.
+              </div>
+              {SAMPLE_MARKETS.map((market) => (
+                <button key={market.rank} className="market-row sample-row" onClick={openCreate}>
+                  <span className="market-rank">#{market.rank}</span>
+                  <span className="market-main">
+                    <strong>{market.title}</strong>
+                    <small>{market.meta} · {market.odds} breach odds</small>
+                  </span>
+                </button>
+              ))}
+              <button className="wide primary" onClick={openCreate}><Target size={16} /> Create a Real Pact</button>
             </div>
           ) : null}
           {rows.map((row, index) => (
@@ -301,10 +404,10 @@ function App() {
           ))}
         </div>
 
-        <div className="panel detail pixel-frame">
+        <div className={`panel detail ${flash === "detail" ? "flash" : ""}`} ref={detailRef}>
           <div className="panel-title">
             <ShieldCheck size={18} />
-            <h2>Odds Terminal</h2>
+            <h2>Odds & Settlement</h2>
           </div>
           {selected ? (
             <>
@@ -338,13 +441,9 @@ function App() {
 
               <dl className="facts">
                 <div><dt>Subject</dt><dd>{short(selected.subject)}</dd></div>
-                <div><dt>Target</dt><dd>{selectedRow ? short(milestoneTarget(selectedRow.paramsBlob)) : "-"}</dd></div>
                 <div><dt>Bond</dt><dd>{eth(selected.bond)} ETH</dd></div>
                 <div><dt>Commit Pool</dt><dd>{eth(selected.commitPool)} ETH</dd></div>
                 <div><dt>Skeptic Pool</dt><dd>{eth(selected.skepticPool)} ETH</dd></div>
-                <div><dt>Winner Rewards</dt><dd>{eth(selected.rewardPool)} ETH</dd></div>
-                <div><dt>Insurance</dt><dd>{eth(selected.insurancePool)} ETH</dd></div>
-                <div><dt>Community</dt><dd>{eth(selected.communityPool)} ETH</dd></div>
               </dl>
 
               <div className="actions">
@@ -353,38 +452,69 @@ function App() {
               </div>
             </>
           ) : (
-            <div className="empty-state tall">
-              <ShieldCheck size={26} />
-              <strong>Select a market</strong>
-              <span>Odds, pools, settlement buckets, and claim controls appear here.</span>
+            <div className="sample-detail">
+              <div className="price-band sample">
+                <div>
+                  <span className="label">Sample breach probability</span>
+                  <strong>38.75%</strong>
+                </div>
+                <span className="outcome-pill">Demo</span>
+                <div className="bar"><span style={{ width: "38.75%" }} /></div>
+                <div className="sparkline" aria-label="Sample price history">
+                  {SAMPLE_ODDS.map((value, index, arr) => (
+                    <i key={index} style={{ left: `${(index / (arr.length - 1)) * 100}%`, bottom: `${value}%` }} />
+                  ))}
+                </div>
+              </div>
+
+              <dl className="facts">
+                <div><dt>Subject</dt><dd>0x7A3F...B92C</dd></div>
+                <div><dt>Bond</dt><dd>2.5 ETH</dd></div>
+                <div><dt>Commit Pool</dt><dd>8.7 ETH</dd></div>
+                <div><dt>Skeptic Pool</dt><dd>5.5 ETH</dd></div>
+              </dl>
+
+              <div className="trade-box disabled-preview" aria-disabled="true">
+                <button className="side active">Commit</button>
+                <button className="side">Skeptic</button>
+                <label>
+                  Stake ETH
+                  <input value="1.0" readOnly />
+                </label>
+                <button className="primary" onClick={openCreate}><Target size={16} /> Create Live Market</button>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="panel profile pixel-frame">
-          <div className="panel-title">
-            <UserRound size={18} />
-            <h2>Credibility Card</h2>
+        {showProfile && (
+          <div className="panel profile">
+            <div className="panel-title">
+              <UserRound size={18} />
+              <h2>Credibility Card</h2>
+              <button className="icon-button close" onClick={() => setShowProfile(false)} title="Close"><X size={16} /></button>
+            </div>
+            <label>
+              Subject address
+              <input value={profileAddress} onChange={(event) => setProfileAddress(event.target.value)} />
+            </label>
+            <button className="wide" onClick={() => refreshProfile()}>Load Profile</button>
+            {profile ? (
+              <dl className="facts profile-facts">
+                <div><dt>Score</dt><dd>{eth(profile.score)} ETH</dd></div>
+                <div><dt>Kept</dt><dd>{profile.kept.toString()}</dd></div>
+                <div><dt>Broken</dt><dd>{profile.broken.toString()}</dd></div>
+                <div><dt>Staked Kept</dt><dd>{eth(profile.stakedKept)} ETH</dd></div>
+              </dl>
+            ) : (
+              <div className="hint-box">Select a market or paste a subject address to inspect its SBT record.</div>
+            )}
           </div>
-          <label>
-            Subject address
-            <input value={profileAddress} onChange={(event) => setProfileAddress(event.target.value)} />
-          </label>
-          <button className="wide" onClick={() => refreshProfile()}>Load Profile</button>
-          {profile ? (
-            <dl className="facts profile-facts">
-              <div><dt>Score</dt><dd>{eth(profile.score)} ETH</dd></div>
-              <div><dt>Kept</dt><dd>{profile.kept.toString()}</dd></div>
-              <div><dt>Broken</dt><dd>{profile.broken.toString()}</dd></div>
-              <div><dt>Staked Kept</dt><dd>{eth(profile.stakedKept)} ETH</dd></div>
-            </dl>
-          ) : (
-            <div className="hint-box">Select a market or paste a subject address to inspect its SBT record.</div>
-          )}
-        </div>
-      </section>
+        )}
+      </Reveal>
+      </div>
 
-      {message ? <div className="status pixel-frame">{message}</div> : null}
+      {message ? <Reveal className="status">{message}</Reveal> : null}
     </main>
   );
 }
