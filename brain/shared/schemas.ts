@@ -1,1 +1,1 @@
-export * from "../../shared/schemas.js";
+export * from "../../ledger/shared/schemas.js";

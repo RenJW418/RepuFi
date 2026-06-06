@@ -308,9 +308,19 @@ function resolveSharedDir(explicitSharedDir: string | undefined): string {
     return localShared;
   }
 
+  const ledgerShared = resolve(process.cwd(), "ledger", "shared");
+  if (existsSync(resolve(ledgerShared, "addresses.json"))) {
+    return ledgerShared;
+  }
+
   const parentShared = resolve(process.cwd(), "..", "shared");
   if (existsSync(resolve(parentShared, "addresses.json"))) {
     return parentShared;
+  }
+
+  const siblingLedgerShared = resolve(process.cwd(), "..", "ledger", "shared");
+  if (existsSync(resolve(siblingLedgerShared, "addresses.json"))) {
+    return siblingLedgerShared;
   }
 
   return localShared;

@@ -1,20 +1,25 @@
-# RepuFi Ledger
+# RepuFi
 
-RepuFi 模块一 Ledger 的当前目录落地版本。它实现链上承诺市场、parimutuel 双边池、Resolver 裁决入口、自验证里程碑适配器，以及不可转移的 Credibility SBT。
+RepuFi is split into two module folders:
+
+- `ledger/`: module one, on-chain commitment market, settlement, credibility SBT, and frontend.
+- `brain/`: module two, agent predicate compilation, pricing, verification, coaching, and Ledger integration.
+
+The Ledger module implements chain-hosted commitment markets, parimutuel pools, the Resolver boundary, on-chain milestone self-resolution, and non-transferable Credibility SBT profiles.
 
 ## 已实现
 
-- `PactMarket`: 合约生成 `pactId` 和 `predicateHash`，支持立约、Commit/Skeptic 下注、违约概率定价、结算、领奖。
-- `CredibilitySBT`: 每个 subject 一份不可转移信誉档案，守约按 `bond * difficulty` 加分，违约扣分并累计永久污点。
-- `Resolver`: 支持授权 verifier 的 EIP-191 签名裁决，也支持 `selfResolve` 走自验证 adapter。
-- `OnchainMilestoneAdapter`: MVP 自验证谓词，判断目标地址是否已部署合约。
-- `shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
-- `scripts/seedDemo.ts`: 不依赖 Brain，直接跑守约/违约两条路径。
+- `ledger/contracts/PactMarket.sol`: 合约生成 `pactId` 和 `predicateHash`，支持立约、Commit/Skeptic 下注、违约概率定价、结算、领奖。
+- `ledger/contracts/CredibilitySBT.sol`: 每个 subject 一份不可转移信誉档案，守约按 `bond * difficulty` 加分，违约扣分并累计永久污点。
+- `ledger/contracts/Resolver.sol`: 支持授权 verifier 的 EIP-191 签名裁决，也支持 `selfResolve` 走自验证 adapter。
+- `ledger/contracts/adapters/OnchainMilestoneAdapter.sol`: MVP 自验证谓词，判断目标地址是否已部署合约。
+- `ledger/shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
+- `ledger/scripts/seedDemo.ts`: 不依赖 Brain，直接跑守约/违约两条路径。
 
 ## 命令
 
 ```bash
-npm install
+npm run setup
 npm run compile
 npm test
 npm run demo
@@ -23,13 +28,13 @@ npm run demo
 本地节点部署：
 
 ```bash
-npx hardhat node
+npm run node
 npm run deploy
 ```
 
 部署脚本会写入：
-- `shared/addresses.json`
-- `shared/abis/*.json`
+- `ledger/shared/addresses.json`
+- `ledger/shared/abis/*.json`
 
 ## 关键接口
 

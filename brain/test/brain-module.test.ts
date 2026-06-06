@@ -171,7 +171,7 @@ describe("Brain module selfcheck", () => {
 
   it("loads the RepuFi module-one shared addresses and ABI seam for real ledger mode", () => {
     const client = new RepuFiLedgerClient({
-      sharedDir: "../shared",
+      sharedDir: "../ledger/shared",
       skepticPrivateKey: verifierPrivateKey,
       verifierPrivateKey,
     });

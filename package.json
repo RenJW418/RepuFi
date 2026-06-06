@@ -1,29 +1,28 @@
 {
-  "name": "repufi-ledger",
+  "name": "repufi",
   "version": "0.1.0",
   "private": true,
-  "description": "PACT Ledger module: on-chain commitment market and credibility SBT",
+  "description": "RepuFi monorepo with Ledger and Brain modules",
   "scripts": {
+    "setup": "npm install --prefix ledger && npm install --prefix ledger/frontend && npm install --prefix brain",
+    "node": "npm --prefix ledger run node",
+    "compile": "npm --prefix ledger run compile",
+    "test": "npm --prefix ledger test",
+    "deploy": "npm --prefix ledger run deploy",
+    "demo": "npm --prefix ledger run demo",
+    "frontend:dev": "npm --prefix ledger run frontend:dev",
+    "frontend:build": "npm --prefix ledger run frontend:build",
+    "ledger:node": "npm --prefix ledger run node",
+    "ledger:compile": "npm --prefix ledger run compile",
+    "ledger:test": "npm --prefix ledger test",
+    "ledger:deploy": "npm --prefix ledger run deploy",
+    "ledger:demo": "npm --prefix ledger run demo",
+    "ledger:frontend:dev": "npm --prefix ledger run frontend:dev",
+    "ledger:frontend:build": "npm --prefix ledger run frontend:build",
     "brain:demo": "npm --prefix brain run demo --",
     "brain:smoke": "npm --prefix brain run repuFi:smoke",
     "brain:selfcheck": "npm --prefix brain run selfcheck",
     "brain:test": "npm --prefix brain test",
-    "brain:typecheck": "npm --prefix brain run typecheck",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "deploy": "hardhat run scripts/deploy.ts --network localhost",
-    "demo": "tsx scripts/seedDemo.ts",
-    "frontend:dev": "npm --prefix frontend run dev",
-    "frontend:build": "npm --prefix frontend run build"
-  },
-  "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.0.8",
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@openzeppelin/contracts": "^5.0.2",
-    "@types/node": "^20.14.10",
-    "ethers": "^6.13.1",
-    "hardhat": "^2.22.6",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "brain:typecheck": "npm --prefix brain run typecheck"
   }
 }

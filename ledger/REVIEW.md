@@ -24,7 +24,7 @@
 
 ## 本轮落地范围
 
-在当前目录根下实现方案一，不写入 `调研/`：
+在 `ledger/` 模块目录下实现方案一，不写入 `调研/`：
 - Hardhat + TypeScript 工程。
 - `PactMarket`、`CredibilitySBT`、`Resolver`、`OnchainMilestoneAdapter`。
 - `shared/schemas.ts`、`shared/addresses.json`、ABI 导出目录。

@@ -17,16 +17,16 @@ npm run brain:demo -- --path breach
 For real module-one integration:
 
 ```bash
-npx hardhat node
+npm run node
 npm run deploy
 npm run brain:smoke
 ```
 
-`brain:smoke` reads contract addresses and ABIs from the root `shared/` directory, creates an on-chain pact, places a Brain skeptic position, submits an EIP-191 signed verdict, and reads `CredibilitySBT.getProfile`.
+`brain:smoke` reads contract addresses and ABIs from `ledger/shared/`, creates an on-chain pact, places a Brain skeptic position, submits an EIP-191 signed verdict, and reads `CredibilitySBT.getProfile`.
 
 ## Boundaries
 
 - `brain/agents/base/ledger.ts` is the only Ledger boundary.
 - `MODE=mock` uses `brain/mocks/LocalLedgerMock.ts`.
 - `MODE=local` or `MODE=testnet` uses `brain/agents/base/repuFiLedger.ts`.
-- Root `shared/schemas.ts`, `shared/addresses.json`, and `shared/abis/` remain the single integration source of truth.
+- `ledger/shared/schemas.ts`, `ledger/shared/addresses.json`, and `ledger/shared/abis/` remain the single integration source of truth.

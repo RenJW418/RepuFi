@@ -1,10 +1,15 @@
 node_modules/
-frontend/node_modules/
+ledger/node_modules/
+ledger/frontend/node_modules/
+brain/node_modules/
 
 artifacts/
 cache/
 typechain-types/
-frontend/dist/
+ledger/artifacts/
+ledger/cache/
+ledger/typechain-types/
+ledger/frontend/dist/
 
 .env
 .env.*
