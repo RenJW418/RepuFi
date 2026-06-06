@@ -1,0 +1,27 @@
+{
+  "name": "repufi-brain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "tsx scripts/demo.ts",
+    "repuFi:smoke": "tsx scripts/repuFiSmoke.ts",
+    "selfcheck": "tsx scripts/selfcheck.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.63.0",
+    "ethers": "^6.15.0",
+    "tsx": "^4.20.6",
+    "viem": "^2.40.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  },
+  "overrides": {
+    "ws": "8.21.0"
+  }
+}
