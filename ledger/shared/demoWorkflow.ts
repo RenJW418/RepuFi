@@ -115,7 +115,11 @@ export const demoScenarioTemplates: DemoScenarioTemplate[] = [
 
 export function scenarioById(id: string): DemoScenarioTemplate {
   const scenario = demoScenarioTemplates.find((item) => item.id === id);
-  return scenario ?? demoScenarioTemplates[0];
+  const defaultScenario = demoScenarioTemplates[0];
+  if (!defaultScenario) {
+    throw new Error("No demo scenario templates configured.");
+  }
+  return scenario ?? defaultScenario;
 }
 
 export function analyzeGoalForDemo(input: {

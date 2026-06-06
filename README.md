@@ -18,6 +18,7 @@ The Ledger module implements chain-hosted commitment markets, parimutuel pools, 
 - `ledger/shared/schemas.ts`: 与 Brain 拼接的枚举和共享类型单一真源。
 - `ledger/shared/demoWorkflow.ts`: 三类 demo case 的目标审查、predicate 编译、分类、UMA/多 Agent/人工复核展示模型。
 - `ledger/frontend/`: 从目标输入、Agent 审查、发布广场、分类筛选、下注、裁决、领取到信誉档案的演示工作台。
+- `brain/agents/intake/review.ts`: 后台 Agent intake 入口；拒绝宽泛目标，只有可量化、到期可判断、有客观证据路径的目标才会返回可发布 predicate。
 - `ledger/scripts/seedDemo.ts`: 不依赖 Brain，直接跑守约/违约两条路径。
 - `ledger/scripts/demoScenarios.ts`: 三类 MD 场景的链上 smoke，逐个创建、下注、签名裁决、领奖。
 
@@ -30,6 +31,7 @@ npm test
 npm run demo
 npm run ledger:demo:scenarios
 npm run ledger:frontend:build
+npm run brain:selfcheck
 npm run brain:scenarios
 ```
 
@@ -87,6 +89,8 @@ npm run brain:scenarios
 ```
 
 `ledger:demo:scenarios` 证明 L1/L2/L3 都能在合约上创建、下注、裁决、领取；其中 L3 走 oracle/Agent 分歧后的链上 token-holder review 再结算。`brain:scenarios` 证明 L1/L2/L3 的 kept/breach 六条 Brain mock 路径都能编译 predicate、下注、验真、签名、结算。
+
+`brain:selfcheck` 额外证明后台 Agent intake 会拒绝“我要变得更好”这类宽泛目标，并接受 L1/L2/L3 三类 demo 目标后返回 HABIT、ONCHAIN_MILESTONE、POLICY 三种可发布 predicate。
 
 当前 demo 没有接真实 UMA 主网/测试网；网页和 `Resolver` 按官方 Polymarket/UMA 文档映射乐观预言机、争议升级和代币持有人投票流程，本地链用授权 verifier 打开裁决或争议，再由 `Resolver` 完成资金结算。
 

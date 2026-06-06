@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Wallet } from "ethers";
 
 import { createCoachNudge } from "../agents/coach/nudge.js";
+import { reviewGoalIntake } from "../agents/intake/review.js";
 import { createLedger } from "../agents/base/ledger.js";
 import { RepuFiLedgerClient } from "../agents/base/repuFiLedger.js";
 import { compilePredicate } from "../agents/predicate/compile.js";
@@ -14,12 +15,48 @@ import { createMockLlm } from "../llm/mock.js";
 import { runBrainDemo } from "../scripts/demo.js";
 import { mdScenarioDefinitions, runMdScenarioMatrix } from "../scripts/scenarios.js";
 import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
+import { demoScenarioTemplates } from "../../ledger/shared/demoWorkflow.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
 const verifierPrivateKey =
   "0x59c6995e998f97a5a004497e5da8e8d40188335a8e5c08c7871a7464a26d70d5";
 
 describe("Brain module selfcheck", () => {
+  it("rejects broad goal intake before predicate compilation", () => {
+    const decision = reviewGoalIntake({
+      goal: "我要变得更好",
+      stakeEth: "1",
+      scenarioId: "l1-habit",
+    });
+
+    expect(decision.accepted).toBe(false);
+    expect(decision.predicate).toBeUndefined();
+    expect(decision.analysis.reasons).toEqual(
+      expect.arrayContaining(["目标缺少可量化数字", "目标缺少明确到期时间", "目标缺少客观证据来源"]),
+    );
+  });
+
+  it("accepts the three MD demo goals and returns publishable predicates", () => {
+    const decisions = demoScenarioTemplates.map((scenario) =>
+      reviewGoalIntake({
+        goal: scenario.goal,
+        stakeEth: scenario.defaultStakeEth,
+        scenarioId: scenario.id,
+      }),
+    );
+
+    expect(decisions.every((decision) => decision.accepted)).toBe(true);
+    expect(decisions.map((decision) => decision.analysis.tier)).toEqual(["L1", "L2", "L3"]);
+    expect(decisions.map((decision) => decision.predicate?.predType)).toEqual([
+      PredType.HABIT,
+      PredType.ONCHAIN_MILESTONE,
+      PredType.POLICY,
+    ]);
+    for (const decision of decisions) {
+      expect(decision.predicate?.paramsBlob).toMatch(/^0x[0-9a-f]+$/);
+    }
+  });
+
   it("compiles an L2 natural-language goal into a schema-valid onchain predicate", async () => {
     const predicate = await compilePredicate({
       goal: "Q3 主网上线",
