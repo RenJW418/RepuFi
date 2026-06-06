@@ -229,6 +229,9 @@ function App() {
                 <div><dt>Bond</dt><dd>{eth(selected.bond)} ETH</dd></div>
                 <div><dt>Commit</dt><dd>{eth(selected.commitPool)} ETH</dd></div>
                 <div><dt>Skeptic</dt><dd>{eth(selected.skepticPool)} ETH</dd></div>
+                <div><dt>Winner rewards</dt><dd>{eth(selected.rewardPool)} ETH</dd></div>
+                <div><dt>Insurance</dt><dd>{eth(selected.insurancePool)} ETH</dd></div>
+                <div><dt>Community</dt><dd>{eth(selected.communityPool)} ETH</dd></div>
                 <div><dt>Close prob</dt><dd>{pct(selected.closeProbBps)}</dd></div>
                 <div><dt>Price points</dt><dd>{priceHistory.length}</dd></div>
               </dl>

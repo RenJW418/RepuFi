@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { artifacts, ethers } from "hardhat";
 
 async function main() {
-  const [deployer, verifier] = await ethers.getSigners();
+  const [deployer, verifier, insurance, community] = await ethers.getSigners();
 
   const credibility = await ethers.deployContract("CredibilitySBT", [deployer.address]);
   await credibility.waitForDeployment();
@@ -19,6 +19,7 @@ async function main() {
 
   await (await credibility.setMarket(await market.getAddress())).wait();
   await (await market.setResolver(await resolver.getAddress())).wait();
+  await (await market.setTreasuries(insurance.address, community.address)).wait();
   await (await resolver.setVerifier(verifier.address, true)).wait();
   await (await resolver.setAdapter(1, await adapter.getAddress())).wait();
 
@@ -26,6 +27,8 @@ async function main() {
     chainId: Number((await ethers.provider.getNetwork()).chainId),
     deployer: deployer.address,
     verifier: verifier.address,
+    insuranceTreasury: insurance.address,
+    communityTreasury: community.address,
     CredibilitySBT: await credibility.getAddress(),
     PactMarket: await market.getAddress(),
     Resolver: await resolver.getAddress(),

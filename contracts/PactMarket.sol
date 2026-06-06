@@ -26,6 +26,8 @@ contract PactMarket is Ownable, ReentrancyGuard {
         uint256 commitPool;
         uint256 skepticPool;
         uint256 rewardPool;
+        uint256 insurancePool;
+        uint256 communityPool;
         uint64 closeProbBps;
         bool closeSnapshotted;
         Outcome outcome;
@@ -33,9 +35,15 @@ contract PactMarket is Ownable, ReentrancyGuard {
     }
 
     uint256 public constant BPS = 10_000;
+    uint256 public constant KEPT_WINNER_REWARD_BPS = 8_000;
+    uint256 public constant BREACHED_COMMIT_TO_WINNERS_BPS = 7_000;
+    uint256 public constant BREACHED_BOND_TO_WINNERS_BPS = 4_000;
+    uint256 public constant BREACHED_BOND_TO_COMMUNITY_BPS = 5_000;
 
     ICredibility public credibility;
     address public resolver;
+    address public insuranceTreasury;
+    address public communityTreasury;
 
     mapping(bytes32 => Pact) public pacts;
     mapping(address => uint256) public nonceOf;
@@ -46,6 +54,7 @@ contract PactMarket is Ownable, ReentrancyGuard {
 
     event ResolverSet(address indexed resolver);
     event CredibilitySet(address indexed credibility);
+    event TreasuriesSet(address indexed insuranceTreasury, address indexed communityTreasury);
     event PactCreated(
         bytes32 indexed id,
         address indexed subject,
@@ -58,7 +67,9 @@ contract PactMarket is Ownable, ReentrancyGuard {
     event PositionTaken(bytes32 indexed id, Side indexed side, address indexed account, uint256 amount, uint256 breachProbBps);
     event CloseSnapshotted(bytes32 indexed id, uint64 closeProbBps);
     event Settled(bytes32 indexed id, Outcome outcome, bytes32 evidenceHash, uint64 closeProbBps);
+    event RewardBuckets(bytes32 indexed id, uint256 winnerRewardPool, uint256 insurancePool, uint256 communityPool);
     event Claimed(bytes32 indexed id, address indexed account, Side side, uint256 payout);
+    event TreasuryPaid(bytes32 indexed id, address indexed treasury, uint256 amount, string bucket);
 
     error InvalidDeadline();
     error EmptyBond();
@@ -73,10 +84,14 @@ contract PactMarket is Ownable, ReentrancyGuard {
     error NothingToClaim();
     error TransferFailed();
     error InvalidOutcome();
+    error InvalidTreasury();
 
     constructor(address initialOwner, address credibility_) Ownable(initialOwner) {
         credibility = ICredibility(credibility_);
+        insuranceTreasury = initialOwner;
+        communityTreasury = initialOwner;
         emit CredibilitySet(credibility_);
+        emit TreasuriesSet(initialOwner, initialOwner);
     }
 
     modifier onlyExisting(bytes32 id) {
@@ -97,6 +112,13 @@ contract PactMarket is Ownable, ReentrancyGuard {
     function setCredibility(address newCredibility) external onlyOwner {
         credibility = ICredibility(newCredibility);
         emit CredibilitySet(newCredibility);
+    }
+
+    function setTreasuries(address newInsuranceTreasury, address newCommunityTreasury) external onlyOwner {
+        if (newInsuranceTreasury == address(0) || newCommunityTreasury == address(0)) revert InvalidTreasury();
+        insuranceTreasury = newInsuranceTreasury;
+        communityTreasury = newCommunityTreasury;
+        emit TreasuriesSet(newInsuranceTreasury, newCommunityTreasury);
     }
 
     function hashPredicate(uint8 predType, bytes calldata paramsBlob) public pure returns (bytes32) {
@@ -125,6 +147,8 @@ contract PactMarket is Ownable, ReentrancyGuard {
             commitPool: 0,
             skepticPool: 0,
             rewardPool: 0,
+            insurancePool: 0,
+            communityPool: 0,
             closeProbBps: 0,
             closeSnapshotted: false,
             outcome: Outcome.Pending,
@@ -188,14 +212,10 @@ contract PactMarket is Ownable, ReentrancyGuard {
         pact.outcome = outcome;
         pact.settled = true;
         uint256 subjectBond = pact.bond;
-
         if (outcome == Outcome.Kept) {
-            pact.rewardPool = pact.skepticPool;
-            pact.bond = 0;
-            (bool ok,) = pact.subject.call{value: subjectBond}("");
-            if (!ok) revert TransferFailed();
+            _settleKept(id, pact);
         } else {
-            pact.rewardPool = pact.commitPool + subjectBond;
+            _settleBreached(id, pact);
         }
 
         credibility.onSettle(
@@ -206,6 +226,37 @@ contract PactMarket is Ownable, ReentrancyGuard {
         );
 
         emit Settled(id, outcome, evidenceHash, pact.closeProbBps);
+        emit RewardBuckets(id, pact.rewardPool, pact.insurancePool, pact.communityPool);
+    }
+
+    function _settleKept(bytes32 id, Pact storage pact) internal {
+        uint256 subjectBond = pact.bond;
+        pact.rewardPool = (pact.skepticPool * KEPT_WINNER_REWARD_BPS) / BPS;
+        pact.insurancePool = pact.skepticPool - pact.rewardPool;
+        pact.bond = 0;
+
+        (bool ok,) = pact.subject.call{value: subjectBond}("");
+        if (!ok) revert TransferFailed();
+        _payTreasury(id, insuranceTreasury, pact.insurancePool, "insurance");
+    }
+
+    function _settleBreached(bytes32 id, Pact storage pact) internal {
+        uint256 subjectBond = pact.bond;
+        uint256 commitWinnerReward = (pact.commitPool * BREACHED_COMMIT_TO_WINNERS_BPS) / BPS;
+        uint256 bondWinnerReward = (subjectBond * BREACHED_BOND_TO_WINNERS_BPS) / BPS;
+        pact.rewardPool = commitWinnerReward + bondWinnerReward;
+        pact.communityPool = (subjectBond * BREACHED_BOND_TO_COMMUNITY_BPS) / BPS;
+        pact.insurancePool = pact.commitPool + subjectBond - pact.rewardPool - pact.communityPool;
+
+        _payTreasury(id, communityTreasury, pact.communityPool, "community");
+        _payTreasury(id, insuranceTreasury, pact.insurancePool, "insurance");
+    }
+
+    function _payTreasury(bytes32 id, address treasury, uint256 amount, string memory bucket) internal {
+        if (amount == 0) return;
+        (bool ok,) = treasury.call{value: amount}("");
+        if (!ok) revert TransferFailed();
+        emit TreasuryPaid(id, treasury, amount, bucket);
     }
 
     function claim(bytes32 id) external nonReentrant onlyExisting(id) {

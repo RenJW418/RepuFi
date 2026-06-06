@@ -52,6 +52,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidTreasury",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotResolver",
     "type": "error"
   },
@@ -299,6 +304,37 @@
       },
       {
         "indexed": false,
+        "internalType": "uint256",
+        "name": "winnerRewardPool",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "insurancePool",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "communityPool",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardBuckets",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
         "internalType": "enum PactMarket.Outcome",
         "name": "outcome",
         "type": "uint8"
@@ -320,8 +356,149 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "insuranceTreasury",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "communityTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "TreasuriesSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "treasury",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "bucket",
+        "type": "string"
+      }
+    ],
+    "name": "TreasuryPaid",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BREACHED_BOND_TO_COMMUNITY_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BREACHED_BOND_TO_INSURANCE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BREACHED_BOND_TO_WINNERS_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BREACHED_COMMIT_TO_INSURANCE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BREACHED_COMMIT_TO_WINNERS_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "KEPT_INSURANCE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "KEPT_WINNER_REWARD_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -383,6 +560,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "communityTreasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -483,6 +673,16 @@
             "type": "uint256"
           },
           {
+            "internalType": "uint256",
+            "name": "insurancePool",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "communityPool",
+            "type": "uint256"
+          },
+          {
             "internalType": "uint64",
             "name": "closeProbBps",
             "type": "uint64"
@@ -549,6 +749,19 @@
         "internalType": "uint256",
         "name": "bps",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "insuranceTreasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -634,6 +847,16 @@
       {
         "internalType": "uint256",
         "name": "rewardPool",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "insurancePool",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "communityPool",
         "type": "uint256"
       },
       {
@@ -778,6 +1001,24 @@
       }
     ],
     "name": "setResolver",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newInsuranceTreasury",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "newCommunityTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "setTreasuries",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

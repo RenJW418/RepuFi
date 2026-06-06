@@ -39,6 +39,26 @@ npm run deploy
 - 读价格：`PactMarket.impliedBreachProb(pactId)`，返回 bps，默认 5000。
 - 读信誉：`CredibilitySBT.getProfile(subject)`。
 
+## 奖池分配
+
+守约 `Kept`：
+
+```text
+subject 拿回 100% bond
+Commit 赢家拿回本金 + 80% Skeptic 输家池
+20% Skeptic 输家池进入 insuranceTreasury
+```
+
+违约 `Breached`：
+
+```text
+Skeptic 赢家拿回本金 + 70% Commit 输家池 + 40% bond
+50% bond 进入 communityTreasury
+30% Commit 输家池 + 10% bond 进入 insuranceTreasury
+```
+
+这让市场不再是简单赢家通吃：赢家被奖励，受影响社区获得赔付，协议持续积累公共信誉保险池。
+
 签名口径固定为：
 
 ```text

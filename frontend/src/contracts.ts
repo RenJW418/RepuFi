@@ -15,6 +15,8 @@ export type Pact = {
   commitPool: bigint;
   skepticPool: bigint;
   rewardPool: bigint;
+  insurancePool: bigint;
+  communityPool: bigint;
   closeProbBps: bigint;
   closeSnapshotted: boolean;
   outcome: bigint;

@@ -21,7 +21,7 @@ async function createPact(subject: any, market: any, target: string, bond = ONE)
 }
 
 async function main() {
-  const [deployer, verifier, subject, commit, skeptic] = await ethers.getSigners();
+  const [deployer, verifier, subject, commit, skeptic, insurance, community] = await ethers.getSigners();
 
   const credibility = await ethers.deployContract("CredibilitySBT", [deployer.address]);
   const market = await ethers.deployContract("PactMarket", [deployer.address, await credibility.getAddress()]);
@@ -37,6 +37,7 @@ async function main() {
 
   await (await credibility.setMarket(await market.getAddress())).wait();
   await (await market.setResolver(await resolver.getAddress())).wait();
+  await (await market.setTreasuries(insurance.address, community.address)).wait();
   await (await resolver.setVerifier(verifier.address, true)).wait();
   await (await resolver.setAdapter(PredType.ONCHAIN_MILESTONE, await adapter.getAddress())).wait();
 

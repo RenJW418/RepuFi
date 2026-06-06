@@ -15,7 +15,7 @@
 主要风险与处理：
 - 签名口径容易不一致：实现固定为 `keccak256(abi.encode(pactId, uint8(outcome), evidenceHash))` + EIP-191 `personal_sign`。
 - `predicateHash` 不能 A/B 各算：实现由合约根据 `predType + paramsBlob` 统一计算。
-- 违约 bond 去向需要明确：MVP 中违约时 bond 并入 Skeptic 赢家池，不做存款人赔付。
+- 违约 bond 去向需要明确：当前违约时 bond 拆分给 Skeptic 赢家、communityTreasury 和 insuranceTreasury，不再简单赢家通吃。
 - 信誉口径需要稳定：守约加分使用 `bond * closeProbBps / 10000`，违约按 bond 扣分并永久增加 `broken`。
 
 ## 对方案二的 Review
@@ -40,6 +40,7 @@
 - 非自验证路径：`Resolver.submitVerdict` 使用 EIP-191 签名恢复授权 verifier。
 - 资金边界：多赢家领取时最后一个赢家吃掉整数除法 dust，最终合约余额归零。
 - 前端：`frontend/` 从 `shared/` 读取 ABI/地址，提供创建、市场列表、单 pact 详情、价格历史点、下注、selfResolve、claim 和信誉档案。
+- 奖池分配：守约时 80% 输家池给 Commit、20% 进保险池；违约时 70% Commit + 40% bond 给 Skeptic、50% bond 给社区、30% Commit + 10% bond 给保险池。
 
 已验证命令：
 - `npm run compile`

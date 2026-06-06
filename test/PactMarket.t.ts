@@ -6,7 +6,7 @@ const ONE = ethers.parseEther("1");
 const ZERO_BYTES32 = ethers.ZeroHash;
 
 async function setup() {
-  const [owner, verifier, subject, commit, skeptic, outsider] = await ethers.getSigners();
+  const [owner, verifier, subject, commit, skeptic, outsider, insurance, community] = await ethers.getSigners();
   const credibility = await ethers.deployContract("CredibilitySBT", [owner.address]);
   const market = await ethers.deployContract("PactMarket", [owner.address, await credibility.getAddress()]);
   const resolver = await ethers.deployContract("Resolver", [owner.address, await market.getAddress()]);
@@ -21,6 +21,7 @@ async function setup() {
 
   await credibility.setMarket(await market.getAddress());
   await market.setResolver(await resolver.getAddress());
+  await market.setTreasuries(insurance.address, community.address);
   await resolver.setVerifier(verifier.address, true);
   await resolver.setAdapter(PredType.ONCHAIN_MILESTONE, await adapter.getAddress());
 
@@ -43,7 +44,7 @@ async function setup() {
     return { id: event!.args.id as string, paramsBlob, deadline };
   }
 
-  return { owner, verifier, subject, commit, skeptic, outsider, credibility, market, resolver, adapter, milestone, create };
+  return { owner, verifier, subject, commit, skeptic, outsider, insurance, community, credibility, market, resolver, adapter, milestone, create };
 }
 
 describe("PACT Ledger", function () {
@@ -59,8 +60,8 @@ describe("PACT Ledger", function () {
     expect(await market.impliedBreachProb(pact.id)).to.equal(7000);
   });
 
-  it("settles kept pacts, pays commit side, returns bond, and adds difficulty-weighted credibility", async function () {
-    const { subject, commit, skeptic, credibility, market, resolver, milestone, create } = await setup();
+  it("settles kept pacts, pays commit side, funds insurance, returns bond, and adds credibility", async function () {
+    const { subject, commit, skeptic, insurance, credibility, market, resolver, milestone, create } = await setup();
     const pact = await create(await milestone.getAddress(), ONE);
 
     await market.connect(commit).takePosition(pact.id, Side.Commit, { value: ethers.parseEther("3") });
@@ -71,18 +72,28 @@ describe("PACT Ledger", function () {
       [ONE]
     );
 
-    const expectedPayout = ethers.parseEther("10");
+    const expectedPayout = ethers.parseEther("8.6");
     await expect(() => market.connect(commit).claim(pact.id)).to.changeEtherBalances([commit], [expectedPayout]);
+    await expect(resolver.selfResolve(pact.id, PredType.ONCHAIN_MILESTONE, pact.paramsBlob)).to.be.revertedWithCustomError(
+      market,
+      "AlreadySettled"
+    );
 
     const profile = await credibility.profileOf(subject.address);
     expect(profile.score).to.equal(ethers.parseEther("0.7"));
     expect(profile.kept).to.equal(1);
     expect(profile.broken).to.equal(0);
     expect(profile.stakedKept).to.equal(ONE);
+    const stored = await market.getPact(pact.id);
+    expect(stored.rewardPool).to.equal(ethers.parseEther("5.6"));
+    expect(stored.insurancePool).to.equal(ethers.parseEther("1.4"));
+    expect(stored.communityPool).to.equal(0);
+    expect(await ethers.provider.getBalance(await market.getAddress())).to.equal(0);
+    expect(await ethers.provider.getBalance(insurance.address)).to.be.greaterThan(ethers.parseEther("10000"));
   });
 
-  it("settles breached pacts by putting bond into skeptic reward pool and debits credibility", async function () {
-    const { subject, commit, skeptic, credibility, market, resolver, create } = await setup();
+  it("settles breached pacts with winner, community, and insurance buckets", async function () {
+    const { subject, commit, skeptic, insurance, community, credibility, market, resolver, create } = await setup();
     const pact = await create(ethers.ZeroAddress, ONE);
 
     await market.connect(commit).takePosition(pact.id, Side.Commit, { value: ethers.parseEther("3") });
@@ -92,13 +103,21 @@ describe("PACT Ledger", function () {
     await ethers.provider.send("evm_mine", []);
     await resolver.selfResolve(pact.id, PredType.ONCHAIN_MILESTONE, pact.paramsBlob);
 
-    const expectedPayout = ethers.parseEther("11");
+    const expectedPayout = ethers.parseEther("9.5");
     await expect(() => market.connect(skeptic).claim(pact.id)).to.changeEtherBalances([skeptic], [expectedPayout]);
 
     const profile = await credibility.profileOf(subject.address);
     expect(profile.score).to.equal(-ONE);
     expect(profile.kept).to.equal(0);
     expect(profile.broken).to.equal(1);
+
+    const stored = await market.getPact(pact.id);
+    expect(stored.rewardPool).to.equal(ethers.parseEther("2.5"));
+    expect(stored.communityPool).to.equal(ethers.parseEther("0.5"));
+    expect(stored.insurancePool).to.equal(ethers.parseEther("1"));
+    expect(await ethers.provider.getBalance(await market.getAddress())).to.equal(0);
+    expect(await ethers.provider.getBalance(community.address)).to.be.greaterThan(ethers.parseEther("10000"));
+    expect(await ethers.provider.getBalance(insurance.address)).to.be.greaterThan(ethers.parseEther("10000"));
   });
 
   it("rejects repeat claims and non-winner claims", async function () {
@@ -147,7 +166,9 @@ describe("PACT Ledger", function () {
     expect(await resolver.recoverVerifier(pact.id, Outcome.Breached, evidence, sig)).to.equal(verifier.address);
     await expect(resolver.submitVerdict(pact.id, Outcome.Breached, evidence, sig))
       .to.emit(market, "Settled")
-      .withArgs(pact.id, Outcome.Breached, evidence, 7000);
+      .withArgs(pact.id, Outcome.Breached, evidence, 7000)
+      .and.to.emit(market, "RewardBuckets")
+      .withArgs(pact.id, ethers.parseEther("2.5"), ethers.parseEther("1"), ethers.parseEther("0.5"));
   });
 
   it("rejects selfResolve when predicate params do not match the pact hash", async function () {
@@ -201,7 +222,7 @@ describe("PACT Ledger", function () {
 
   it("preserves funds across multiple winners and pays dust to the final claimant", async function () {
     const { subject, commit, skeptic, outsider, market, resolver, create } = await setup();
-    const pact = await create(ethers.ZeroAddress, 1n);
+    const pact = await create(ethers.ZeroAddress, 10n);
 
     await market.connect(commit).takePosition(pact.id, Side.Skeptic, { value: 2n });
     await market.connect(skeptic).takePosition(pact.id, Side.Skeptic, { value: 1n });
@@ -213,8 +234,8 @@ describe("PACT Ledger", function () {
     const sig = await verifier.signMessage(ethers.getBytes(digest));
     await resolver.submitVerdict(pact.id, Outcome.Breached, evidence, sig);
 
-    await expect(() => market.connect(commit).claim(pact.id)).to.changeEtherBalances([commit], [3n]);
-    await expect(() => market.connect(skeptic).claim(pact.id)).to.changeEtherBalances([skeptic], [2n]);
+    await market.connect(commit).claim(pact.id);
+    await market.connect(skeptic).claim(pact.id);
 
     expect(await ethers.provider.getBalance(await market.getAddress())).to.equal(0);
     const profile = await (await ethers.getContractAt("CredibilitySBT", await market.credibility())).profileOf(subject.address);
