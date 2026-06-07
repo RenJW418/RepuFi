@@ -126,9 +126,10 @@ function outcomeClass(outcome?: bigint) {
 }
 
 const SAMPLE_MARKETS = [
-  // ─── 最热门：三个具名 demo（视频演示用，已部署到 Sepolia）───
+  // ─── 最热门：三个具名 demo（视频演示用，已部署到 Sepolia，pactId 真实可下注）───
   {
     id: "l1-habit",
+    pactId: "0xccea0049fab57856ae539239a6b2de008de6d52c03b5e479bf7f368ed46592d0",
     tier: "L1 Habit",
     featured: true,
     title: {
@@ -147,6 +148,7 @@ const SAMPLE_MARKETS = [
   },
   {
     id: "l2-delivery",
+    pactId: "0xef8f3f831467b77112d1e571ced156bd4a50d4a8444b411a26a1e1d7014d309b",
     tier: "L2 Delivery",
     featured: true,
     title: {
@@ -165,6 +167,7 @@ const SAMPLE_MARKETS = [
   },
   {
     id: "l3-policy",
+    pactId: "0x0a9df538d952ba4e0ab02fb11767a4213f56c065a2a5308ee42cab7832e5aacb",
     tier: "L3 Policy",
     featured: true,
     title: {
@@ -181,9 +184,10 @@ const SAMPLE_MARKETS = [
     kyc: true,
     twitterVerified: true,
   },
-  // ─── 其他展示例子（比赛展示用，不部署到链上）───
+  // ─── 其他展示例子（比赛展示用，不部署到链上，pactId 为空）───
   {
     id: "demo-l1-fitness",
+    pactId: "",
     tier: "L1 Habit",
     featured: false,
     title: {
@@ -202,6 +206,7 @@ const SAMPLE_MARKETS = [
   },
   {
     id: "demo-l2-token",
+    pactId: "",
     tier: "L2 Delivery",
     featured: false,
     title: {
@@ -220,6 +225,7 @@ const SAMPLE_MARKETS = [
   },
   {
     id: "demo-l3-mayor",
+    pactId: "",
     tier: "L3 Policy",
     featured: false,
     title: {
@@ -955,8 +961,24 @@ function App() {
                 const renderCard = (market: typeof SAMPLE_MARKETS[number]) => {
                   const breach = parseFloat(market.odds);
                   const name = tb(market.displayName);
+                  const hasOnchain = Boolean(market.pactId);
+                  // Real on-chain demo → open bet modal (wallet). Otherwise → create flow.
+                  const onCommit = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (hasOnchain) openBetModal(market.pactId, 0);
+                    else openCreate();
+                  };
+                  const onSkeptic = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (hasOnchain) openBetModal(market.pactId, 1);
+                    else openCreate();
+                  };
+                  const onCard = () => {
+                    if (hasOnchain) setSelectedId(market.pactId);
+                    else openCreate();
+                  };
                   return (
-                    <div key={market.id} className="pm-card sample-row" onClick={openCreate}>
+                    <div key={market.id} className="pm-card sample-row" onClick={onCard}>
                       <div className="pm-card-top">
                         <div className="pm-icon">{name.slice(0, 2)}</div>
                         <div className="pm-title-wrap">
@@ -966,10 +988,10 @@ function App() {
                         <ProbGauge breachPct={breach} keptLabel={t("outcomeKept")} />
                       </div>
                       <div className="pm-actions">
-                        <button className="pm-btn commit" onClick={(e) => { e.stopPropagation(); openCreate(); }}>
+                        <button className="pm-btn commit" onClick={onCommit}>
                           {t("commit")} <b>{(100 - breach).toFixed(0)}¢</b>
                         </button>
-                        <button className="pm-btn skeptic" onClick={(e) => { e.stopPropagation(); openCreate(); }}>
+                        <button className="pm-btn skeptic" onClick={onSkeptic}>
                           {t("skeptic")} <b>{breach.toFixed(0)}¢</b>
                         </button>
                       </div>
