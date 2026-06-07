@@ -1670,3 +1670,42 @@ dd {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Section labels in market list (Featured / More) */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--accent-deep);
+  margin: 6px 0 2px;
+}
+
+.section-label:not(:first-child) {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.section-label svg { color: var(--accent); }
+
+/* Amount input with currency selector */
+.amount-input {
+  display: flex;
+  gap: 6px;
+}
+
+.amount-input input {
+  flex: 1;
+  min-width: 0;
+}
+
+.amount-input select {
+  width: auto;
+  flex: 0 0 78px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}

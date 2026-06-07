@@ -105,36 +105,89 @@ function outcomeClass(outcome?: bigint) {
 }
 
 const SAMPLE_MARKETS = [
+  // ─── 最热门：三个具名 demo（视频演示用，已部署到 Sepolia）───
   {
     id: "l1-habit",
     tier: "L1 Habit",
-    title: "Will 0x30e3...f92 complete 24 morning runs in 30 days?",
+    featured: true,
+    title: "姚帅能否做到连续 30 天早睡早起（每天 23:00 前睡、7:00 前起）？",
     deadline: "30d",
-    odds: "42%",
-    bond: "0.001",
-    author: "@repufi_demo",
+    odds: "38%",
+    bond: "0.5",
+    currency: "ETH",
+    author: "@yaoshuai",
+    displayName: "姚帅",
     kyc: true,
     twitterVerified: true,
   },
   {
     id: "l2-delivery",
     tier: "L2 Delivery",
-    title: "Will 0x30e3...f92 launch mainnet and publish contract address by Q3?",
-    deadline: "45d",
-    odds: "58%",
-    bond: "0.002",
-    author: "@repufi_demo",
+    featured: true,
+    title: "RepuFi 项目方能否在 Q3（7/1–9/30）前完成主网上线并公布合约地址？",
+    deadline: "92d",
+    odds: "55%",
+    bond: "5",
+    currency: "ETH",
+    author: "@RepuFi_team",
+    displayName: "RepuFi 项目方",
     kyc: true,
     twitterVerified: true,
   },
   {
     id: "l3-policy",
     tier: "L3 Policy",
-    title: "Will 0x30e3...f92 improve public service satisfaction from 65% to 80%?",
-    deadline: "60d",
-    odds: "31%",
-    bond: "0.003",
-    author: "@repufi_demo",
+    featured: true,
+    title: "特朗普能否兑现中期选举承诺：任内将通胀率降至 3% 以下？",
+    deadline: "180d",
+    odds: "64%",
+    bond: "120",
+    currency: "USDC",
+    author: "@realDonaldTrump",
+    displayName: "Donald Trump",
+    kyc: true,
+    twitterVerified: true,
+  },
+  // ─── 其他展示例子（比赛展示用，不部署到链上）───
+  {
+    id: "demo-l1-fitness",
+    tier: "L1 Habit",
+    featured: false,
+    title: "健身博主能否完成 90 天打卡挑战（每周至少 4 练）？",
+    deadline: "90d",
+    odds: "45%",
+    bond: "0.2",
+    currency: "ETH",
+    author: "@fit_chen",
+    displayName: "陈教练",
+    kyc: false,
+    twitterVerified: true,
+  },
+  {
+    id: "demo-l2-token",
+    tier: "L2 Delivery",
+    featured: false,
+    title: "某 DeFi 协议能否在年底前实现 TVL 突破 1 亿美元？",
+    deadline: "200d",
+    odds: "71%",
+    bond: "10",
+    currency: "USDC",
+    author: "@defi_lab",
+    displayName: "DeFi Lab",
+    kyc: true,
+    twitterVerified: false,
+  },
+  {
+    id: "demo-l3-mayor",
+    tier: "L3 Policy",
+    featured: false,
+    title: "某市长能否兑现任内新增 5000 个公租房名额的承诺？",
+    deadline: "365d",
+    odds: "52%",
+    bond: "50",
+    currency: "USDC",
+    author: "@city_gov",
+    displayName: "市政公开账号",
     kyc: true,
     twitterVerified: true,
   },
@@ -201,6 +254,7 @@ function App() {
   const [message, setMessage] = useState("Ready. Start local chain, deploy, then refresh markets.");
   const [target, setTarget] = useState(ZeroAddress);
   const [bond, setBond] = useState("1");
+  const [bondCurrency, setBondCurrency] = useState<"ETH" | "USDC">("ETH");
   const [stake, setStake] = useState("1");
   const [side, setSide] = useState<0 | 1>(0);
   const [deadlineMinutes, setDeadlineMinutes] = useState("30");
@@ -575,8 +629,14 @@ function App() {
                 </select>
               </label>
               <label>
-                Bond ETH
-                <input value={bond} onChange={(event) => setBond(event.target.value)} />
+                Stake amount
+                <div className="amount-input">
+                  <input value={bond} onChange={(event) => setBond(event.target.value)} />
+                  <select value={bondCurrency} onChange={(e) => setBondCurrency(e.target.value as "ETH" | "USDC")}>
+                    <option value="ETH">ETH</option>
+                    <option value="USDC">USDC</option>
+                  </select>
+                </div>
               </label>
             </div>
             <button className="wide" onClick={reviewGoal} disabled={brainPending}>
@@ -657,21 +717,22 @@ function App() {
 
           {rows.length === 0 ? (
             <div className="sample-list">
-              <div className="sample-note">
-                <Trophy size={18} />
-                Demo markets — connect to Sepolia to see live data.
-              </div>
-              {SAMPLE_MARKETS
-                .filter((m) => activeCategory === "All" || m.tier.startsWith(activeCategory))
-                .map((market) => {
+              {(() => {
+                const visible = SAMPLE_MARKETS.filter(
+                  (m) => activeCategory === "All" || m.tier.startsWith(activeCategory),
+                );
+                const featured = visible.filter((m) => m.featured);
+                const others = visible.filter((m) => !m.featured);
+
+                const renderCard = (market: typeof SAMPLE_MARKETS[number]) => {
                   const breach = parseFloat(market.odds);
                   return (
                     <div key={market.id} className="pm-card sample-row" onClick={openCreate}>
                       <div className="pm-card-top">
-                        <div className="pm-icon">{market.tier.slice(0, 2)}</div>
+                        <div className="pm-icon">{market.displayName.slice(0, 2)}</div>
                         <div className="pm-title-wrap">
                           <p className="pm-title">{market.title}</p>
-                          <span className="pm-cat">{market.tier}</span>
+                          <span className="pm-cat">{market.tier} · {market.displayName}</span>
                         </div>
                         <ProbGauge breachPct={breach} />
                       </div>
@@ -684,7 +745,7 @@ function App() {
                         </button>
                       </div>
                       <div className="pm-footer">
-                        <span className="pm-vol">{market.bond} ETH bond</span>
+                        <span className="pm-vol">{market.bond} {market.currency} staked</span>
                         <div className="pm-ids">
                           {market.twitterVerified && <span className="id-badge twitter">𝕏 {market.author}</span>}
                           {market.kyc && <span className="id-badge kyc">KYC ✓</span>}
@@ -693,7 +754,25 @@ function App() {
                       </div>
                     </div>
                   );
-                })}
+                };
+
+                return (
+                  <>
+                    {featured.length > 0 && (
+                      <>
+                        <div className="section-label"><Trophy size={15} /> 最热门 · Featured</div>
+                        {featured.map(renderCard)}
+                      </>
+                    )}
+                    {others.length > 0 && (
+                      <>
+                        <div className="section-label">更多市场 · More Markets</div>
+                        {others.map(renderCard)}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
               <button className="wide primary" onClick={openCreate}><Target size={16} /> Create a Real Pact</button>
             </div>
           ) : null}
