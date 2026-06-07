@@ -616,6 +616,7 @@ function App() {
           <div className="panel-title">
             <ShieldCheck size={18} />
             <h2>Odds & Settlement</h2>
+            {detailLoading && <span className="loading-dot" aria-label="Loading…" />}
           </div>
           {selected ? (
             <>
