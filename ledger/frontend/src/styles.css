@@ -33,8 +33,8 @@
   --shadow: 0 14px 40px rgba(67, 38, 24, 0.08);
   --radius: 8px;
   --font-pixel: "Pixelify Sans", "Silkscreen", "Press Start 2P", "Courier New", monospace;
-  --font-body: var(--font-pixel);
-  --font-mono: var(--font-pixel);
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Courier New", monospace;
 
   color: var(--ink);
   background: var(--bg);
@@ -73,13 +73,16 @@ h1 {
   line-height: 1;
   letter-spacing: 0;
   text-transform: uppercase;
+  font-family: var(--font-pixel); /* keep pixel only on h1 hero titles */
 }
 
 h2 {
   font-size: 18px;
-  line-height: 1;
+  line-height: 1.2;
   letter-spacing: 0;
-  text-transform: uppercase;
+  text-transform: none; /* no all-caps on panels */
+  font-family: var(--font-body);
+  font-weight: 600;
 }
 
 button {
@@ -212,6 +215,7 @@ label {
   color: #fff;
   font-weight: 700;
   letter-spacing: 0;
+  font-family: var(--font-pixel); /* RF logo keeps pixel look */
 }
 
 .brand-lockup p {
