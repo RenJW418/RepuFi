@@ -112,8 +112,9 @@ const SAMPLE_MARKETS = [
     featured: true,
     title: "姚帅能否做到连续 30 天早睡早起（每天 23:00 前睡、7:00 前起）？",
     deadline: "30d",
-    odds: "38%",
-    bond: "0.5",
+    odds: "37%",
+    bond: "2.5",
+    volume: "12.4 ETH",
     currency: "ETH",
     author: "@yaoshuai",
     displayName: "姚帅",
@@ -126,8 +127,9 @@ const SAMPLE_MARKETS = [
     featured: true,
     title: "RepuFi 项目方能否在 Q3（7/1–9/30）前完成主网上线并公布合约地址？",
     deadline: "92d",
-    odds: "55%",
-    bond: "5",
+    odds: "52%",
+    bond: "25",
+    volume: "86.7 ETH",
     currency: "ETH",
     author: "@RepuFi_team",
     displayName: "RepuFi 项目方",
@@ -140,8 +142,9 @@ const SAMPLE_MARKETS = [
     featured: true,
     title: "特朗普能否兑现中期选举承诺：任内将通胀率降至 3% 以下？",
     deadline: "180d",
-    odds: "64%",
-    bond: "120",
+    odds: "61%",
+    bond: "500,000",
+    volume: "2,480,000 USDC",
     currency: "USDC",
     author: "@realDonaldTrump",
     displayName: "Donald Trump",
@@ -155,8 +158,9 @@ const SAMPLE_MARKETS = [
     featured: false,
     title: "健身博主能否完成 90 天打卡挑战（每周至少 4 练）？",
     deadline: "90d",
-    odds: "45%",
-    bond: "0.2",
+    odds: "44%",
+    bond: "1.8",
+    volume: "5.2 ETH",
     currency: "ETH",
     author: "@fit_chen",
     displayName: "陈教练",
@@ -169,8 +173,9 @@ const SAMPLE_MARKETS = [
     featured: false,
     title: "某 DeFi 协议能否在年底前实现 TVL 突破 1 亿美元？",
     deadline: "200d",
-    odds: "71%",
-    bond: "10",
+    odds: "73%",
+    bond: "80,000",
+    volume: "420,000 USDC",
     currency: "USDC",
     author: "@defi_lab",
     displayName: "DeFi Lab",
@@ -183,8 +188,9 @@ const SAMPLE_MARKETS = [
     featured: false,
     title: "某市长能否兑现任内新增 5000 个公租房名额的承诺？",
     deadline: "365d",
-    odds: "52%",
-    bond: "50",
+    odds: "48%",
+    bond: "150,000",
+    volume: "680,000 USDC",
     currency: "USDC",
     author: "@city_gov",
     displayName: "市政公开账号",
@@ -205,6 +211,8 @@ interface DemoMeta {
   currency: "ETH" | "USDC";
   kyc: boolean;
   twitterVerified: boolean;
+  breachPct: number;   // varied per market so gauges differ
+  volume: string;      // realistic-looking total staked volume
 }
 const DEMO_META: Record<string, DemoMeta> = {
   "0xccea0049fab57856ae539239a6b2de008de6d52c03b5e479bf7f368ed46592d0": {
@@ -214,6 +222,8 @@ const DEMO_META: Record<string, DemoMeta> = {
     currency: "ETH",
     kyc: true,
     twitterVerified: true,
+    breachPct: 37,
+    volume: "12.4 ETH",
   },
   "0xef8f3f831467b77112d1e571ced156bd4a50d4a8444b411a26a1e1d7014d309b": {
     title: "RepuFi 项目方能否在 Q3（7/1–9/30）前完成主网上线并公布合约地址？",
@@ -222,6 +232,8 @@ const DEMO_META: Record<string, DemoMeta> = {
     currency: "ETH",
     kyc: true,
     twitterVerified: true,
+    breachPct: 52,
+    volume: "86.7 ETH",
   },
   "0x0a9df538d952ba4e0ab02fb11767a4213f56c065a2a5308ee42cab7832e5aacb": {
     title: "特朗普能否兑现中期选举承诺：任内将通胀率降至 3% 以下？",
@@ -230,6 +242,8 @@ const DEMO_META: Record<string, DemoMeta> = {
     currency: "USDC",
     kyc: true,
     twitterVerified: true,
+    breachPct: 61,
+    volume: "2,480,000 USDC",
   },
 };
 
@@ -321,6 +335,11 @@ function App() {
   const [reviewVoters, setReviewVoters] = useState<ReviewVoterRow[]>([]);
   const [showResolution, setShowResolution] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Bet modal (wallet stake dialog)
+  const [betModal, setBetModal] = useState<{ pactId: string; side: 0 | 1 } | null>(null);
+  const [betAmount, setBetAmount] = useState("0.1");
+  const [betPending, setBetPending] = useState(false);
 
   // Per-market breach probability (bps) for card gauges
   const [probMap, setProbMap] = useState<Record<string, number>>({});
@@ -503,6 +522,35 @@ function App() {
     await tx.wait();
     setMessage("Position confirmed on-chain.");
     await refresh();
+  }
+
+  // Open the wallet bet dialog for a given market + side (from card or detail)
+  function openBetModal(pactId: string, betSide: 0 | 1) {
+    setSelectedId(pactId);
+    setBetModal({ pactId, side: betSide });
+    setBetAmount("0.1");
+  }
+
+  // Confirm the bet — prompts wallet, sends takePosition tx
+  async function confirmBet() {
+    if (!betModal) return;
+    setBetPending(true);
+    try {
+      const { market } = await getWriteContracts();
+      const tx = await market.takePosition(betModal.pactId, betModal.side, {
+        value: parseEther(betAmount || "0"),
+      });
+      setMessage(betModal.side === 0 ? "Backing Commit side..." : "Backing Skeptic side...");
+      await tx.wait();
+      setMessage("Position confirmed on-chain.");
+      setBetModal(null);
+      await refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? (err as any).shortMessage ?? err.message : "Transaction failed";
+      setMessage(`Bet failed: ${msg}`);
+    } finally {
+      setBetPending(false);
+    }
   }
 
   async function selfResolve() {
@@ -783,7 +831,7 @@ function App() {
                         </button>
                       </div>
                       <div className="pm-footer">
-                        <span className="pm-vol">{market.bond} {market.currency} staked</span>
+                        <span className="pm-vol">{market.volume} Vol.</span>
                         <div className="pm-ids">
                           {market.twitterVerified && <span className="id-badge twitter">𝕏 {market.author}</span>}
                           {market.kyc && <span className="id-badge kyc">KYC ✓</span>}
@@ -822,12 +870,16 @@ function App() {
               const tier = PRED_LABELS[row.predType] ?? "Commitment";
               const identity = identityStore[row.subject.toLowerCase()];
               const demo = DEMO_META[row.id.toLowerCase()];
-              const breach = (probMap[row.id] ?? 5000) / 100; // bps → pct
+              // On-chain prob if traded; else fall back to demo's varied figure so gauges differ
+              const onchainProb = probMap[row.id];
+              const breach = onchainProb !== undefined && onchainProb !== 5000
+                ? onchainProb / 100
+                : (demo?.breachPct ?? (onchainProb ?? 5000) / 100);
               const kept = 100 - breach;
               const title = demo?.title ?? cardTitle(row, identity);
               const iconText = demo?.displayName.slice(0, 2) ?? tier.slice(0, 2);
               const catLabel = demo ? `${tier} · ${demo.displayName}` : tier;
-              const currency = demo?.currency ?? "ETH";
+              const volume = demo?.volume;
               // identity: prefer explicitly linked, else fall back to demo metadata
               const xHandle = identity?.twitterHandle ?? demo?.author?.replace(/^@/, "");
               const xVerified = identity?.twitterVerified ?? demo?.twitterVerified ?? false;
@@ -849,19 +901,19 @@ function App() {
                   <div className="pm-actions">
                     <button
                       className="pm-btn commit"
-                      onClick={(e) => { e.stopPropagation(); setSelectedId(row.id); setSide(0); focusPanel(detailRef, "detail"); }}
+                      onClick={(e) => { e.stopPropagation(); openBetModal(row.id, 0); }}
                     >
                       Commit <b>{kept.toFixed(0)}¢</b>
                     </button>
                     <button
                       className="pm-btn skeptic"
-                      onClick={(e) => { e.stopPropagation(); setSelectedId(row.id); setSide(1); focusPanel(detailRef, "detail"); }}
+                      onClick={(e) => { e.stopPropagation(); openBetModal(row.id, 1); }}
                     >
                       Skeptic <b>{breach.toFixed(0)}¢</b>
                     </button>
                   </div>
                   <div className="pm-footer">
-                    <span className="pm-vol">{eth(row.bond)} {currency} staked</span>
+                    <span className="pm-vol">{volume ? `${volume} Vol.` : `${eth(row.bond)} ETH bond`}</span>
                     <div className="pm-ids">
                       {xVerified && xHandle
                         ? <span className="id-badge twitter">𝕏 @{xHandle}</span>
@@ -902,13 +954,19 @@ function App() {
               </div>
 
               <div className="trade-box">
-                <button className={side === 0 ? "side active" : "side"} onClick={() => setSide(0)}>Commit</button>
-                <button className={side === 1 ? "side active skeptic" : "side"} onClick={() => setSide(1)}>Skeptic</button>
-                <label>
-                  Stake ETH
-                  <input value={stake} onChange={(event) => setStake(event.target.value)} />
-                </label>
-                <button className="primary" onClick={takePosition}><CircleDollarSign size={16} /> Stake</button>
+                <button
+                  className="side active"
+                  onClick={() => openBetModal(selected ? selectedId : "", 0)}
+                >
+                  <CircleDollarSign size={15} /> Commit
+                </button>
+                <button
+                  className="side skeptic"
+                  onClick={() => openBetModal(selected ? selectedId : "", 1)}
+                >
+                  <CircleDollarSign size={15} /> Skeptic
+                </button>
+                <div className="trade-hint">点击下注，钱包将弹出确认质押金额</div>
               </div>
 
               <dl className="facts">
@@ -1133,6 +1191,60 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Bet (stake) Modal — wallet dialog */}
+      {betModal && (() => {
+        const demo = DEMO_META[betModal.pactId.toLowerCase()];
+        const onchainProb = probMap[betModal.pactId];
+        const breach = onchainProb !== undefined && onchainProb !== 5000
+          ? onchainProb / 100
+          : (demo?.breachPct ?? 50);
+        const isCommit = betModal.side === 0;
+        const price = isCommit ? (100 - breach) : breach;
+        const amt = parseFloat(betAmount || "0");
+        const shares = price > 0 ? (amt / (price / 100)) : 0;
+        return (
+          <div className="modal-overlay" onClick={() => !betPending && setBetModal(null)}>
+            <div className="modal bet-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-title">
+                <CircleDollarSign size={18} />
+                <h2>{isCommit ? "Back Commit (守约)" : "Back Skeptic (违约)"}</h2>
+                <button className="icon-button close" onClick={() => !betPending && setBetModal(null)}><X size={16} /></button>
+              </div>
+              {demo && <p className="bet-market-title">{demo.title}</p>}
+              <div className={`bet-side-banner ${isCommit ? "commit" : "skeptic"}`}>
+                <span>{isCommit ? "你认为 TA 会守约" : "你认为 TA 会违约"}</span>
+                <strong>{price.toFixed(0)}¢ / share</strong>
+              </div>
+              <label>
+                质押金额 (ETH)
+                <input
+                  autoFocus
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
+                  placeholder="0.1"
+                />
+              </label>
+              <div className="bet-quick">
+                {["0.1", "0.5", "1", "5"].map((v) => (
+                  <button key={v} className="bet-chip" onClick={() => setBetAmount(v)}>{v} ETH</button>
+                ))}
+              </div>
+              <dl className="bet-summary">
+                <div><dt>预计份额</dt><dd>{shares.toFixed(2)} shares</dd></div>
+                <div><dt>赢则可得</dt><dd>{shares.toFixed(2)} ETH</dd></div>
+                <div><dt>当前价格</dt><dd>{price.toFixed(0)}¢</dd></div>
+              </dl>
+              <button className="wide primary" onClick={confirmBet} disabled={betPending || amt <= 0}>
+                <Wallet size={16} /> {betPending ? "钱包确认中…" : `确认下注 ${betAmount} ETH`}
+              </button>
+              <div className="hint-box">
+                点击后钱包(MetaMask)将弹出，请在钱包中确认这笔链上质押交易。
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </main>
   );
 }

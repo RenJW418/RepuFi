@@ -1562,12 +1562,12 @@ dd {
 /* Circular probability gauge */
 .prob-gauge {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   flex: 0 0 auto;
 }
 
-.prob-gauge svg { display: block; }
+.prob-gauge svg { display: block; width: 60px; height: 60px; }
 
 .pg-track {
   fill: none;
@@ -1586,23 +1586,28 @@ dd {
 .pg-label {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  text-align: center;
+  pointer-events: none;
 }
 
 .pg-label strong {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .pg-label span {
-  font-size: 8px;
+  font-size: 7px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: .03em;
-  margin-top: 1px;
+  letter-spacing: .04em;
+  margin-top: 2px;
 }
 
 /* Commit / Skeptic buy buttons */
@@ -1708,4 +1713,104 @@ dd {
   flex: 0 0 78px;
   font-weight: 700;
   color: var(--accent-deep);
+}
+
+/* ── Bet modal ── */
+.bet-modal { gap: 12px; }
+
+.bet-market-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.bet-side-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.bet-side-banner span { font-weight: 600; }
+.bet-side-banner strong { font-size: 18px; font-weight: 800; }
+
+.bet-side-banner.commit { background: #e6f6ec; color: #15803d; }
+.bet-side-banner.skeptic { background: #fdeaea; color: #c2410c; }
+
+.bet-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bet-chip {
+  flex: 1;
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+
+.bet-chip:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+.bet-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.bet-summary div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px;
+  text-align: center;
+}
+
+.bet-summary dt {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.bet-summary dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* trade-box buttons in detail panel now full-action */
+.trade-box .side {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.trade-box .side.active {
+  background: #e6f6ec;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.trade-box .side.skeptic {
+  background: #fdeaea;
+  border-color: #fca5a5;
+  color: #c2410c;
+}
+
+.trade-hint {
+  grid-column: span 2;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 2px;
 }
