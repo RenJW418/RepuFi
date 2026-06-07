@@ -61,14 +61,22 @@ function cardTitle(row: PactRow, lang: Lang, identity?: Identity): string {
   return `Will ${name} fulfil this commitment?`;
 }
 
-function timeLeft(deadline: number, lang: Lang): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = deadline - now;
+// Anchor captured once when the app bundle loads — synthetic demo deadlines
+// are offset from this so the on-chain demo cards show a live countdown even
+// though their real on-chain deadlines (seeded with short windows) have passed.
+const APP_LOADED = Math.floor(Date.now() / 1000);
+
+function timeLeft(deadline: number, lang: Lang, nowSec?: number): string {
+  const now = nowSec ?? Math.floor(Date.now() / 1000);
+  let diff = deadline - now;
   if (diff <= 0) return lang === "zh" ? "已截止" : "Expired";
-  if (diff < 60) return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const d = Math.floor(diff / 86400); diff -= d * 86400;
+  const h = Math.floor(diff / 3600); diff -= h * 3600;
+  const m = Math.floor(diff / 60);
+  const s = diff - m * 60;
+  if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
 type BrainReview = {
@@ -242,6 +250,10 @@ interface DemoMeta {
   twitterVerified: boolean;
   breachPct: number;   // varied per market so gauges differ
   volume: string;      // realistic-looking total staked volume
+  // Synthetic deadline offset (seconds from app load). Negative = already
+  // expired (used to demo settlement). The real on-chain deadlines were
+  // seeded with short windows and have long passed, so the card uses this.
+  deadlineOffsetSec: number;
 }
 const DEMO_META: Record<string, DemoMeta> = {
   "0xccea0049fab57856ae539239a6b2de008de6d52c03b5e479bf7f368ed46592d0": {
@@ -256,6 +268,7 @@ const DEMO_META: Record<string, DemoMeta> = {
     twitterVerified: true,
     breachPct: 37,
     volume: "12.4 ETH",
+    deadlineOffsetSec: 18 * 86400 + 6 * 3600 + 42 * 60, // ~18d live countdown
   },
   "0xef8f3f831467b77112d1e571ced156bd4a50d4a8444b411a26a1e1d7014d309b": {
     title: {
@@ -269,6 +282,7 @@ const DEMO_META: Record<string, DemoMeta> = {
     twitterVerified: true,
     breachPct: 52,
     volume: "86.7 ETH",
+    deadlineOffsetSec: 73 * 86400 + 3 * 3600 + 15 * 60, // ~73d live countdown
   },
   "0x0a9df538d952ba4e0ab02fb11767a4213f56c065a2a5308ee42cab7832e5aacb": {
     title: {
@@ -282,6 +296,7 @@ const DEMO_META: Record<string, DemoMeta> = {
     twitterVerified: true,
     breachPct: 61,
     volume: "2,480,000 USDC",
+    deadlineOffsetSec: -3600, // already expired → demo settlement flow
   },
 };
 
@@ -384,6 +399,13 @@ function App() {
   const [betModal, setBetModal] = useState<{ pactId: string; side: 0 | 1 } | null>(null);
   const [betAmount, setBetAmount] = useState("0.1");
   const [betPending, setBetPending] = useState(false);
+
+  // Ticking clock (seconds) so countdowns update live
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const id = window.setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Per-market breach probability (bps) for card gauges
   const [probMap, setProbMap] = useState<Record<string, number>>({});
@@ -972,7 +994,7 @@ function App() {
                         ? <span className="id-badge twitter">𝕏 @{xHandle}</span>
                         : <span className="id-badge unverified">{t("unverified")}</span>}
                       {kycPassed && <span className="id-badge kyc">KYC ✓</span>}
-                      <span className="pm-deadline">{timeLeft(row.deadline, lang)}</span>
+                      <span className="pm-deadline">{timeLeft(demo ? APP_LOADED + demo.deadlineOffsetSec : row.deadline, lang, nowSec)}</span>
                     </div>
                   </div>
                 </div>
