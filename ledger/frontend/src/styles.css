@@ -1202,3 +1202,94 @@ dd {
     transform: none;
   }
 }
+
+/* ── Polymarket-style market card ── */
+.market-card {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .14s, box-shadow .14s, transform .12s;
+}
+
+.market-card:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 6px 20px rgba(67,38,24,.1);
+  transform: translateY(-2px);
+}
+
+.market-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mc-badge {
+  display: inline-block;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.mc-deadline {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mc-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0;
+  word-break: break-word;
+  text-transform: none;
+}
+
+.mc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mc-prob {
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.mc-prob-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.mc-prob-bar span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ok), var(--warn), var(--bad));
+  transition: width .5s ease;
+}

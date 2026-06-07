@@ -29,8 +29,28 @@ import {
 import "./styles.css";
 
 const OUTCOMES = ["Pending", "Kept", "Breached"];
+const PRED_LABELS: Record<number, string> = { 1: "L2 Delivery", 2: "Outflow", 3: "L1 Habit", 4: "L3 Policy" };
 const ONCHAIN_MILESTONE = 1;
 const BRAIN_API_URL = import.meta.env.VITE_BRAIN_API_URL ?? "http://127.0.0.1:8790";
+
+function cardTitle(row: PactRow): string {
+  const label = PRED_LABELS[row.predType] ?? "Commitment";
+  const target = milestoneTarget(row.paramsBlob);
+  if (row.predType === 1) return `[${label}] Will ${short(row.subject)} deploy ${short(target)}?`;
+  if (row.predType === 3) return `[${label}] Will ${short(row.subject)} complete the habit streak?`;
+  if (row.predType === 4) return `[${label}] Will ${short(row.subject)} meet the policy target?`;
+  return `[${label}] Will ${short(row.subject)} fulfil this commitment?`;
+}
+
+function timeLeft(deadline: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = deadline - now;
+  if (diff <= 0) return "Expired";
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
 
 type BrainReview = {
   accepted: boolean;
@@ -150,34 +170,47 @@ function App() {
   // Resolution / ReviewVoters
   const [reviewVoters, setReviewVoters] = useState<ReviewVoterRow[]>([]);
   const [showResolution, setShowResolution] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
   const activeQuest = selected ? (selected.outcome === 0n ? "Trading" : OUTCOMES[Number(selected.outcome)]) : "Scout";
 
-  async function refresh() {
+  // Separate list refresh (slow, full scan) from detail refresh (fast, single pact)
+  async function refreshList() {
     const nextRows = await loadPactCreated();
     setRows(nextRows);
-    const nextSelectedId = selectedId || nextRows[0]?.id || "";
-    if (!selectedId && nextSelectedId) {
-      setSelectedId(nextSelectedId);
+    if (!selectedId && nextRows[0]?.id) {
+      setSelectedId(nextRows[0].id);
     }
-    if (nextSelectedId) {
+    setMessage(nextRows.length
+      ? `${nextRows.length} market${nextRows.length > 1 ? "s" : ""} loaded.`
+      : "No markets yet. Create a pact to start.");
+  }
+
+  async function refreshDetail(id: string) {
+    if (!id) { setSelected(null); setBreachProb(0n); setPriceHistory([]); return; }
+    setDetailLoading(true);
+    try {
       const { market } = getReadContracts();
       const [pact, prob, history] = await Promise.all([
-        market.getPact(nextSelectedId),
-        market.impliedBreachProb(nextSelectedId),
-        loadPriceHistory(nextSelectedId)
+        market.getPact(id),
+        market.impliedBreachProb(id),
+        loadPriceHistory(id),
       ]);
       setSelected(pact as Pact);
       setBreachProb(prob as bigint);
       setPriceHistory(history);
-    } else {
-      setSelected(null);
-      setBreachProb(0n);
-      setPriceHistory([]);
+    } finally {
+      setDetailLoading(false);
     }
-    setMessage(nextRows.length ? `Loaded ${nextRows.length} on-chain market${nextRows.length > 1 ? "s" : ""}.` : "No markets yet. Create a pact to start.");
+  }
+
+  // Legacy refresh used by create/resolve/claim (needs both list + detail)
+  async function refresh() {
+    await refreshList();
+    const id = selectedId || rows[0]?.id || "";
+    if (id) await refreshDetail(id);
   }
 
   async function refreshProfile(addr = profileAddress || selected?.subject || account) {
@@ -192,13 +225,32 @@ function App() {
     setMessage(`Loaded profile ${short(addr)}.`);
   }
 
+  // On mount: load list once, then poll list every 15s (not on every selection change)
   useEffect(() => {
-    refresh().catch((error) => setMessage(`RPC offline: ${error.shortMessage ?? error.message}`));
+    refreshList().catch((error) => setMessage(`RPC offline: ${error.shortMessage ?? error.message}`));
     const interval = window.setInterval(() => {
-      refresh().catch(() => undefined);
-    }, 3000);
+      refreshList().catch(() => undefined);
+    }, 15000);
     return () => window.clearInterval(interval);
-  }, [selectedId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When selection changes: only fetch detail for the selected pact (fast — 2 RPC calls)
+  useEffect(() => {
+    if (selectedId) {
+      refreshDetail(selectedId).catch(() => undefined);
+    } else {
+      setSelected(null); setBreachProb(0n); setPriceHistory([]);
+    }
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll detail for active (pending) pact every 8s to keep price curve live
+  useEffect(() => {
+    if (!selectedId) return;
+    const interval = window.setInterval(() => {
+      refreshDetail(selectedId).catch(() => undefined);
+    }, 8000);
+    return () => window.clearInterval(interval);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selected?.subject) {
@@ -530,19 +582,34 @@ function App() {
               <button className="wide primary" onClick={openCreate}><Target size={16} /> Create a Real Pact</button>
             </div>
           ) : null}
-          {rows.map((row, index) => (
-            <button
-              key={row.id}
-              className={`market-row ${row.id === selectedId ? "active" : ""}`}
-              onClick={() => setSelectedId(row.id)}
-            >
-              <span className="market-rank">#{String(index + 1).padStart(2, "0")}</span>
-              <span className="market-main">
-                <strong>Will {short(row.subject)} deploy milestone?</strong>
-                <small>{short(milestoneTarget(row.paramsBlob))} target · {eth(row.bond)} ETH bond</small>
-              </span>
-            </button>
-          ))}
+          {rows.map((row) => {
+            const isActive = row.id === selectedId;
+            const tier = PRED_LABELS[row.predType] ?? "Commitment";
+            return (
+              <button
+                key={row.id}
+                className={`market-card ${isActive ? "active" : ""}`}
+                onClick={() => setSelectedId(row.id)}
+              >
+                <div className="mc-header">
+                  <span className="mc-badge">{tier}</span>
+                  <span className="mc-deadline">{timeLeft(row.deadline)}</span>
+                </div>
+                <p className="mc-title">{cardTitle(row)}</p>
+                <div className="mc-footer">
+                  <span className="mc-bond">{eth(row.bond)} ETH bond</span>
+                  <span className="mc-prob">
+                    {isActive && selected ? pct(breachProb) : "—"} breach
+                  </span>
+                </div>
+                {isActive && selected ? (
+                  <div className="mc-prob-bar">
+                    <span style={{ width: `${Number(breachProb) / 100}%` }} />
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
 
         <div className={`panel detail ${flash === "detail" ? "flash" : ""}`} ref={detailRef}>
