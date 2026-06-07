@@ -6,16 +6,18 @@ const ONE = ethers.parseEther("1");
 const ZERO_BYTES32 = ethers.ZeroHash;
 
 async function setup() {
-  const [owner, verifier, subject, commit, skeptic, outsider, insurance, community] = await ethers.getSigners();
+  const [owner, verifier, subject, commit, skeptic, outsider, insurance, community, reviewer] = await ethers.getSigners();
   const credibility = await ethers.deployContract("CredibilitySBT", [owner.address]);
   const market = await ethers.deployContract("PactMarket", [owner.address, await credibility.getAddress()]);
   const resolver = await ethers.deployContract("Resolver", [owner.address, await market.getAddress()]);
+  const reviewToken = await ethers.deployContract("RepuToken", [owner.address]);
   const adapter = await ethers.deployContract("OnchainMilestoneAdapter");
   const milestone = await ethers.deployContract("MockMilestone");
 
   await credibility.waitForDeployment();
   await market.waitForDeployment();
   await resolver.waitForDeployment();
+  await reviewToken.waitForDeployment();
   await adapter.waitForDeployment();
   await milestone.waitForDeployment();
 
@@ -23,6 +25,7 @@ async function setup() {
   await market.setResolver(await resolver.getAddress());
   await market.setTreasuries(insurance.address, community.address);
   await resolver.setVerifier(verifier.address, true);
+  await resolver.setReviewToken(await reviewToken.getAddress());
   await resolver.setAdapter(PredType.ONCHAIN_MILESTONE, await adapter.getAddress());
 
   async function create(target: string, bond = ONE) {
@@ -44,7 +47,7 @@ async function setup() {
     return { id: event!.args.id as string, paramsBlob, deadline };
   }
 
-  return { owner, verifier, subject, commit, skeptic, outsider, insurance, community, credibility, market, resolver, adapter, milestone, create };
+  return { owner, verifier, subject, commit, skeptic, outsider, insurance, community, reviewer, credibility, market, resolver, reviewToken, adapter, milestone, create };
 }
 
 describe("PACT Ledger", function () {
@@ -169,6 +172,76 @@ describe("PACT Ledger", function () {
       .withArgs(pact.id, Outcome.Breached, evidence, 7000)
       .and.to.emit(market, "RewardBuckets")
       .withArgs(pact.id, ethers.parseEther("2.5"), ethers.parseEther("1"), ethers.parseEther("0.5"));
+  });
+
+  it("escalates oracle and agent disagreement to token-holder review with conflict isolation", async function () {
+    const { owner, subject, commit, skeptic, outsider, reviewer, market, resolver, reviewToken, create } = await setup();
+    const [, verifier,,,,,, community] = await ethers.getSigners();
+    const pact = await create(ethers.ZeroAddress);
+
+    await reviewToken.mint(reviewer.address, ONE);
+    await market.connect(commit).takePosition(pact.id, Side.Commit, { value: ethers.parseEther("3") });
+    await market.connect(skeptic).takePosition(pact.id, Side.Skeptic, { value: ethers.parseEther("7") });
+    await resolver.setReviewThreshold(2);
+    await resolver.setRelatedParty(pact.id, community.address, true);
+
+    await expect(resolver.connect(subject).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ReviewNotOpen"
+    );
+
+    const evidence = ethers.keccak256(ethers.toUtf8Bytes("agent-disagrees-with-oracle"));
+    const digest = await resolver.verdictDigest(pact.id, Outcome.Kept, evidence);
+    const sig = await verifier.signMessage(ethers.getBytes(digest));
+
+    await expect(resolver.submitDisputedVerdict(pact.id, Outcome.Kept, Outcome.Breached, evidence, sig))
+      .to.emit(resolver, "ReviewOpened")
+      .withArgs(pact.id, Outcome.Kept, Outcome.Breached, evidence);
+
+    await expect(resolver.connect(subject).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ConflictedVoter"
+    );
+    await expect(resolver.connect(commit).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ConflictedVoter"
+    );
+    await expect(resolver.connect(skeptic).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ConflictedVoter"
+    );
+    await expect(resolver.connect(community).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ConflictedVoter"
+    );
+
+    await expect(resolver.connect(outsider).voteReview(pact.id, Outcome.Pending)).to.be.revertedWithCustomError(
+      resolver,
+      "InvalidOutcome"
+    );
+    await expect(resolver.connect(outsider).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "NotTokenHolder"
+    );
+    await expect(resolver.connect(reviewer).voteReview(pact.id, Outcome.Breached))
+      .to.emit(resolver, "ReviewVoteCast")
+      .withArgs(pact.id, reviewer.address, Outcome.Breached, 1, 0);
+    await expect(resolver.connect(reviewer).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "AlreadyVoted"
+    );
+
+    await expect(resolver.connect(owner).voteReview(pact.id, Outcome.Breached))
+      .to.emit(resolver, "ReviewFinalized")
+      .withArgs(pact.id, Outcome.Breached, evidence);
+
+    const stored = await market.getPact(pact.id);
+    expect(stored.settled).to.equal(true);
+    expect(stored.outcome).to.equal(Outcome.Breached);
+    await expect(resolver.connect(owner).voteReview(pact.id, Outcome.Breached)).to.be.revertedWithCustomError(
+      resolver,
+      "ReviewNotOpen"
+    );
   });
 
   it("rejects selfResolve when predicate params do not match the pact hash", async function () {

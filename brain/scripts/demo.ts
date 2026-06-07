@@ -131,8 +131,7 @@ function printDemoResult(result: DemoResult): void {
 
 function parsePath(argv: string[]): DemoPath {
   const pathIndex = argv.indexOf("--path");
-  const barePath = argv.find((arg) => arg === "kept" || arg === "breach");
-  const value = pathIndex >= 0 ? argv[pathIndex + 1] : barePath ?? "kept";
+  const value = pathIndex >= 0 ? argv[pathIndex + 1] : "kept";
   if (value !== "kept" && value !== "breach") {
     throw new Error('Usage: npm run demo -- --path kept|breach');
   }

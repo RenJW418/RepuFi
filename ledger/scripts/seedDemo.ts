@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { compileDemoPredicate, demoScenarioTemplates } from "../shared/demoWorkflow";
 import { Outcome, PredType, Side } from "../shared/schemas";
 
 const ONE = ethers.parseEther("1");
@@ -18,6 +19,24 @@ async function createPact(subject: any, market: any, target: string, bond = ONE)
     })
     .find((event: any) => event?.name === "PactCreated");
   return { id: event!.args.id as string, paramsBlob };
+}
+
+async function createScenarioPact(subject: any, market: any, scenario: (typeof demoScenarioTemplates)[number], index: number) {
+  const predicate = compileDemoPredicate(scenario);
+  const deadline = BigInt((await ethers.provider.getBlock("latest"))!.timestamp + 300 + index * 60);
+  const bond = ethers.parseEther(scenario.defaultStakeEth);
+  const tx = await market.connect(subject).createPact(predicate.predType, predicate.paramsBlob, deadline, { value: bond });
+  const receipt = await tx.wait();
+  const event = receipt!.logs
+    .map((log: any) => {
+      try {
+        return market.interface.parseLog(log);
+      } catch {
+        return undefined;
+      }
+    })
+    .find((event: any) => event?.name === "PactCreated");
+  return { id: event!.args.id as string, paramsBlob: predicate.paramsBlob, predicate };
 }
 
 async function main() {
@@ -40,6 +59,14 @@ async function main() {
   await (await market.setTreasuries(insurance.address, community.address)).wait();
   await (await resolver.setVerifier(verifier.address, true)).wait();
   await (await resolver.setAdapter(PredType.ONCHAIN_MILESTONE, await adapter.getAddress())).wait();
+
+  console.log("seeding MD scenario plaza:");
+  for (const [index, scenario] of demoScenarioTemplates.entries()) {
+    const seeded = await createScenarioPact(subject, market, scenario, index);
+    await (await market.connect(commit).takePosition(seeded.id, Side.Commit, { value: ethers.parseEther("0.6") })).wait();
+    await (await market.connect(skeptic).takePosition(seeded.id, Side.Skeptic, { value: ethers.parseEther(index === 0 ? "0.4" : "0.8") })).wait();
+    console.log(`${scenario.tier} ${scenario.title}:`, seeded.id, seeded.predicate.paramsSummary);
+  }
 
   const kept = await createPact(subject, market, await milestone.getAddress());
   await (await market.connect(commit).takePosition(kept.id, Side.Commit, { value: ethers.parseEther("3") })).wait();

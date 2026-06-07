@@ -35,10 +35,12 @@ interface RepuFiAddresses {
   PactMarket?: Hex;
   Resolver?: Hex;
   CredibilitySBT?: Hex;
+  RepuToken?: Hex;
   contracts?: {
     PactMarket?: Hex;
     Resolver?: Hex;
     CredibilitySBT?: Hex;
+    RepuToken?: Hex;
   };
 }
 
@@ -56,6 +58,19 @@ type ResolverContract = Contract & {
     evidenceHash: Bytes32,
     sig: Hex,
   ): Promise<ContractTransactionResponse>;
+  submitDisputedVerdict(
+    id: Bytes32,
+    oracleOutcome: Outcome,
+    agentOutcome: Outcome,
+    evidenceHash: Bytes32,
+    sig: Hex,
+  ): Promise<ContractTransactionResponse>;
+  setRelatedParty(
+    id: Bytes32,
+    account: Hex,
+    related: boolean,
+  ): Promise<ContractTransactionResponse>;
+  voteReview(id: Bytes32, outcome: Outcome): Promise<ContractTransactionResponse>;
 };
 
 type CredibilityContract = Contract & {
@@ -102,7 +117,7 @@ export class RepuFiLedgerClient implements LedgerClient {
   private readonly resolverAbi: InterfaceAbi;
 
   constructor(options: RepuFiLedgerOptions = {}) {
-    const sharedDir = resolveSharedDir(options.sharedDir);
+    const sharedDir = options.sharedDir ?? resolve(process.cwd(), "shared");
     const addresses = loadAddresses(sharedDir);
     this.addresses = {
       PactMarket: requireAddress(addresses.PactMarket ?? addresses.contracts?.PactMarket, "PactMarket"),
@@ -203,6 +218,49 @@ export class RepuFiLedgerClient implements LedgerClient {
     return Number(bps) / 10_000;
   }
 
+  // Submit a disputed verdict (agent outcome differs from oracle outcome) —
+  // triggers human review flow on-chain via Resolver.submitDisputedVerdict.
+  async submitDisputedVerdict(input: {
+    pactId: Bytes32;
+    oracleOutcome: Outcome;
+    agentOutcome: Outcome;
+    evidenceHash: Bytes32;
+    verifierSig: Hex;
+  }): Promise<Settlement> {
+    const resolver = this.resolverWith(this.verifierWallet);
+    const tx = await resolver.submitDisputedVerdict(
+      input.pactId,
+      input.oracleOutcome,
+      input.agentOutcome,
+      input.evidenceHash,
+      input.verifierSig,
+    );
+    const receipt = await tx.wait();
+    if (!receipt) throw new Error("submitDisputedVerdict did not return a receipt.");
+    const pact = await this.getPact(input.pactId);
+    return {
+      pactId: input.pactId,
+      outcome: input.agentOutcome,
+      evidenceHash: input.evidenceHash,
+      difficulty: 0,
+      subject: pact.subject,
+    };
+  }
+
+  // Cast a review vote (token-holder human review after dispute).
+  async voteReview(pactId: Bytes32, outcome: Outcome): Promise<void> {
+    const resolver = this.resolverWith(this.verifierWallet);
+    const tx = await resolver.voteReview(pactId, outcome);
+    await tx.wait();
+  }
+
+  // Mark an account as a related party (interest isolation).
+  async setRelatedParty(pactId: Bytes32, account: Hex, related: boolean): Promise<void> {
+    const resolver = this.resolverWith(this.verifierWallet);
+    const tx = await resolver.setRelatedParty(pactId, account, related);
+    await tx.wait();
+  }
+
   async getPact(pactId: Bytes32): Promise<LedgerPact> {
     const pact = await this.marketRead.getPact(pactId);
     return {
@@ -258,9 +316,9 @@ export class RepuFiLedgerClient implements LedgerClient {
     }
 
     if (eventName === "PositionTaken") {
-      const listener = (pactId: Bytes32, side: bigint, account: Hex, amount: bigint, breachProbBps: bigint) =>
+      const listener = (id: Bytes32, side: bigint, account: Hex, amount: bigint, breachProbBps: bigint) =>
         handler({
-          pactId,
+          pactId: id,
           side: Number(side),
           account,
           amount,
@@ -272,9 +330,9 @@ export class RepuFiLedgerClient implements LedgerClient {
       };
     }
 
-    const listener = (pactId: Bytes32, outcome: bigint, evidenceHash: Bytes32, closeProbBps: bigint) =>
+    const listener = (id: Bytes32, outcome: bigint, evidenceHash: Bytes32, closeProbBps: bigint) =>
       handler({
-        pactId,
+        pactId: id,
         outcome: Number(outcome),
         evidenceHash,
         difficulty: Number(closeProbBps) / 10_000,
@@ -296,34 +354,6 @@ export class RepuFiLedgerClient implements LedgerClient {
 
 function loadAddresses(sharedDir: string): RepuFiAddresses {
   return JSON.parse(readFileSync(resolve(sharedDir, "addresses.json"), "utf8")) as RepuFiAddresses;
-}
-
-function resolveSharedDir(explicitSharedDir: string | undefined): string {
-  if (explicitSharedDir) {
-    return explicitSharedDir;
-  }
-
-  const localShared = resolve(process.cwd(), "shared");
-  if (existsSync(resolve(localShared, "addresses.json"))) {
-    return localShared;
-  }
-
-  const ledgerShared = resolve(process.cwd(), "ledger", "shared");
-  if (existsSync(resolve(ledgerShared, "addresses.json"))) {
-    return ledgerShared;
-  }
-
-  const parentShared = resolve(process.cwd(), "..", "shared");
-  if (existsSync(resolve(parentShared, "addresses.json"))) {
-    return parentShared;
-  }
-
-  const siblingLedgerShared = resolve(process.cwd(), "..", "ledger", "shared");
-  if (existsSync(resolve(siblingLedgerShared, "addresses.json"))) {
-    return siblingLedgerShared;
-  }
-
-  return localShared;
 }
 
 function loadAbi(sharedDir: string, name: string): InterfaceAbi {

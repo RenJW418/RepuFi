@@ -5,6 +5,11 @@ import { createCoachNudge } from "../agents/coach/nudge.js";
 import { createLedger } from "../agents/base/ledger.js";
 import { RepuFiLedgerClient } from "../agents/base/repuFiLedger.js";
 import { compilePredicate } from "../agents/predicate/compile.js";
+import { resolveOutcome } from "../agents/resolver/index.js";
+import { runMultiAgentVerdict } from "../agents/resolver/multiAgent.js";
+import { runHumanReview } from "../agents/resolver/humanReview.js";
+import { proposeOutcomeViaUma } from "../agents/resolver/uma.js";
+import { validateGoal, validateGoalLocally } from "../agents/validator/goalValidator.js";
 import { extractPricingFeatures } from "../agents/skeptic/features.js";
 import { priceBreachProbability } from "../agents/skeptic/price.js";
 import { decideAndPlaceBet } from "../agents/skeptic/bet.js";
@@ -12,7 +17,8 @@ import { verifyOnchainMilestone } from "../agents/verifier/onchain.js";
 import { recoverVerdictSigner, signVerdict } from "../agents/verifier/sign.js";
 import { createMockLlm } from "../llm/mock.js";
 import { runBrainDemo } from "../scripts/demo.js";
-import { Outcome, PredType, Side, type CredibilityProfile } from "../shared/schemas.js";
+import { runAllCases } from "../scripts/demo-cases.js";
+import { Outcome, PredType, Side, type CredibilityProfile, type Hex } from "../shared/schemas.js";
 
 const subject = "0x1000000000000000000000000000000000000001" as const;
 const verifierPrivateKey =
@@ -171,11 +177,192 @@ describe("Brain module selfcheck", () => {
 
   it("loads the RepuFi module-one shared addresses and ABI seam for real ledger mode", () => {
     const client = new RepuFiLedgerClient({
-      sharedDir: "../ledger/shared",
+      sharedDir: "shared",
       skepticPrivateKey: verifierPrivateKey,
       verifierPrivateKey,
     });
 
     expect(client).toBeInstanceOf(RepuFiLedgerClient);
+  });
+
+  // ── Goal Validator ──────────────────────────────────────────────────────────
+
+  it("rejects vague goals that lack quantifiable indicators", () => {
+    const vague = validateGoalLocally("希望变得更健康", "L1");
+    expect(vague.valid).toBe(false);
+    expect(vague.suggestions.length).toBeGreaterThan(0);
+  });
+
+  it("accepts quantified goals for L1, L2, L3", () => {
+    expect(validateGoalLocally("30天养成晨跑", "L1").valid).toBe(true);
+    expect(validateGoalLocally("Q3主网上线", "L2").valid).toBe(true);
+    expect(validateGoalLocally("任期内GDP增长3%", "L3").valid).toBe(true);
+  });
+
+  it("validates goal via LLM mock and returns consistent result", async () => {
+    const llm = createMockLlm();
+    const result = await validateGoal({ goal: "30天养成晨跑", tier: "L1", llm });
+    expect(result.valid).toBe(true);
+    expect(typeof result.reason).toBe("string");
+  });
+
+  // ── Multi-Agent Verdict ─────────────────────────────────────────────────────
+
+  it("runs multi-agent verdict and returns majority outcome with agreement score", async () => {
+    const llm = createMockLlm();
+    const pactId = `0x${"a".repeat(64)}` as Hex;
+    const result = await runMultiAgentVerdict({
+      pactId,
+      goal: "Q3主网上线",
+      evidence: { deployedAddresses: [] },
+      llm,
+    });
+
+    expect(result.verdicts).toHaveLength(3);
+    expect([Outcome.Kept, Outcome.Breached]).toContain(result.majorityOutcome);
+    expect(result.agreement).toBeGreaterThan(0);
+    expect(result.agreement).toBeLessThanOrEqual(1);
+  });
+
+  // ── Human Review (interest isolation) ──────────────────────────────────────
+
+  it("excludes subject and participants from human review vote", () => {
+    const pactId = `0x${"b".repeat(64)}` as Hex;
+    const subjectAddr = "0x1111111111111111111111111111111111111111" as Hex;
+    const participant = "0x2222222222222222222222222222222222222222" as Hex;
+    const voter = "0x3333333333333333333333333333333333333333" as Hex;
+
+    const result = runHumanReview({
+      pactId,
+      subject: subjectAddr,
+      participants: [participant],
+      tokenHolders: [
+        { address: subjectAddr, balance: 1000n },
+        { address: participant, balance: 500n },
+        { address: voter, balance: 300n },
+      ],
+    });
+
+    expect(result.excludedAddresses).toContain(subjectAddr.toLowerCase());
+    expect(result.excludedAddresses).toContain(participant.toLowerCase());
+    expect(result.eligibleVoters).toBe(1);
+  });
+
+  it("defaults to Kept when quorum is not reached", () => {
+    const pactId = `0x${"c".repeat(64)}` as Hex;
+    // No votes cast → quorum not reached → default Kept
+    const result = runHumanReview({
+      pactId,
+      subject: "0x4444444444444444444444444444444444444444" as Hex,
+      participants: [],
+      tokenHolders: [],
+      simulatedVotes: new Map(),
+    });
+
+    expect(result.quorumReached).toBe(false);
+    expect(result.outcome).toBe(Outcome.Kept);
+  });
+
+  // ── UMA Oracle ──────────────────────────────────────────────────────────────
+
+  it("UMA oracle settles without dispute when no forced dispute", async () => {
+    const pactId = `0x${"d".repeat(64)}` as Hex;
+    const result = await proposeOutcomeViaUma({
+      pactId,
+      proposedOutcome: Outcome.Kept,
+      proposer: "0x0000000000000000000000000000000000000001" as Hex,
+      forcedDispute: false,
+    });
+
+    expect(result.disputed).toBe(false);
+    expect(result.proposal.state).toBe("settled");
+    expect(result.outcome).toBe(Outcome.Kept);
+  });
+
+  it("UMA oracle marks disputed when forced", async () => {
+    const pactId = `0x${"e".repeat(64)}` as Hex;
+    const result = await proposeOutcomeViaUma({
+      pactId,
+      proposedOutcome: Outcome.Breached,
+      proposer: "0x0000000000000000000000000000000000000001" as Hex,
+      forcedDispute: true,
+    });
+
+    expect(result.disputed).toBe(true);
+    expect(result.proposal.state).toBe("disputed");
+  });
+
+  // ── Full Resolution Pipeline ────────────────────────────────────────────────
+
+  it("resolves with multi_agent_unanimous when agents agree with primary outcome", async () => {
+    const llm = createMockLlm();
+    const pactId = `0x${"f".repeat(64)}` as Hex;
+
+    const result = await resolveOutcome({
+      pactId,
+      goal: "Q3主网上线",
+      subject: subject as Hex,
+      participants: [],
+      evidence: {},
+      // mock agents all return Kept, so primaryOutcome=Kept → unanimous agreement
+      primaryOutcome: Outcome.Kept,
+      llm,
+      tokenHolders: [],
+    });
+
+    expect(result.source).toBe("multi_agent_unanimous");
+    expect(result.conflict).toBe(false);
+    expect(result.outcome).toBe(Outcome.Kept);
+  });
+
+  it("escalates to human review when primary outcome conflicts with multi-agent mock", async () => {
+    const llm = createMockLlm();
+    const pactId = `0x${"4".repeat(64)}` as Hex;
+
+    // mock agents return Kept, but primary says Breached → conflict → human review
+    const result = await resolveOutcome({
+      pactId,
+      goal: "Q3主网上线",
+      subject: subject as Hex,
+      participants: [],
+      evidence: {},
+      primaryOutcome: Outcome.Breached,
+      llm,
+      tokenHolders: [
+        { address: "0xA000000000000000000000000000000000000001" as Hex, balance: 1000n },
+        { address: "0xA000000000000000000000000000000000000002" as Hex, balance: 500n },
+      ],
+    });
+
+    expect(result.source).toBe("multi_agent_majority_human_review");
+    expect(result.conflict).toBe(true);
+  });
+
+  it("escalates to human review on UMA dispute", async () => {
+    const llm = createMockLlm();
+    const pactId = `0x${"5".repeat(64)}` as Hex;
+
+    const result = await resolveOutcome({
+      pactId,
+      goal: "Q3主网上线",
+      subject: subject as Hex,
+      participants: [],
+      evidence: {},
+      primaryOutcome: Outcome.Kept,
+      simulateUmaDispute: true,
+      llm,
+      tokenHolders: [
+        { address: "0xA000000000000000000000000000000000000001" as Hex, balance: 1000n },
+      ],
+    });
+
+    expect(result.source).toBe("uma_disputed_human_review");
+    expect(result.conflict).toBe(true);
+  });
+
+  // ── Three-Case End-to-End ───────────────────────────────────────────────────
+
+  it("runs all three demo cases (L1/L2/L3 kept and breach) end-to-end without errors", async () => {
+    await expect(runAllCases()).resolves.toBeUndefined();
   });
 });

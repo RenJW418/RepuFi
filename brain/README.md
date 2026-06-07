@@ -9,10 +9,16 @@ Run from the repository root:
 ```bash
 npm run brain:test
 npm run brain:typecheck
+npm run brain:intake
 npm run brain:selfcheck
+npm run brain:scenarios
 npm run brain:demo -- --path kept
 npm run brain:demo -- --path breach
 ```
+
+`brain:intake` starts the backend goal-review agent at `http://127.0.0.1:8790/api/intake/review` by default. The Ledger frontend calls this endpoint before publishing a pact, so broad goals are rejected before wallet interaction and accepted goals return a predicate for the on-chain create-pact transaction. Override with `BRAIN_HOST` and `BRAIN_PORT`.
+
+`brain:scenarios` runs the MD scenario matrix: L1 habit, L2 delivery, and L3 policy commitments, each through kept and breached paths. Every scenario compiles a predicate, creates a pact, prices from credibility, places a Brain position, signs a verdict, settles, and asserts the credibility delta.
 
 For real module-one integration:
 
