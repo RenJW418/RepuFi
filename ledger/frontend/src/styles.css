@@ -1833,3 +1833,37 @@ dd {
   color: var(--accent-deep);
   background: var(--accent-soft);
 }
+
+/* ── xAPI integration ── */
+.xapi-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  margin-left: 2px;
+}
+.xapi-dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+
+.xapi-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  text-decoration: none;
+  padding: 8px 0;
+}
+.xapi-link:hover { text-decoration: underline; }
+
+.xapi-status {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.xapi-status.on { color: var(--ok); }
+
+.share-btn {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}

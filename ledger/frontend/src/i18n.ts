@@ -183,6 +183,35 @@ export const T = {
   msgQuestListed: { zh: "事件已发布到市场。", en: "Quest listed on the market board." },
   msgXLinked: { zh: "𝕏 身份已关联。", en: "𝕏 identity linked." },
   msgKycSimulated: { zh: "已模拟 KYC 通过。", en: "KYC simulated as passed." },
+
+  // xAPI integration
+  xapiBind: { zh: "绑定 xAPI", en: "Bind xAPI" },
+  xapiModalTitle: { zh: "绑定 xAPI · 社交曝光引擎", en: "Bind xAPI · Social Reach Engine" },
+  xapiIntro: {
+    zh: "xAPI 是一个聚合社交媒体与 AI 模型的 API 平台（Twitter/X、抖音、Reddit、微博、AI 模型等）。绑定后，RepuFi 可以用它把你新发布的事件一键推送到社交平台，扩大曝光，并调用 AI 模型自动生成推文文案。",
+    en: "xAPI aggregates social-media and AI-model APIs (Twitter/X, Douyin, Reddit, Weibo, LLMs). Once bound, RepuFi can one-click publish your new pacts to social platforms for maximum reach, and use its models to auto-draft post copy.",
+  },
+  xapiOfficial: { zh: "访问 xAPI 官网", en: "Visit xAPI website" },
+  xapiKeyLabel: { zh: "xAPI API Key", en: "xAPI API Key" },
+  xapiKeyPlaceholder: { zh: "sk-…（在 xapi.to 注册获取）", en: "sk-… (get one at xapi.to)" },
+  xapiSave: { zh: "保存 Key", en: "Save Key" },
+  xapiSaved: { zh: "xAPI Key 已保存。", en: "xAPI Key saved." },
+  xapiConfigured: { zh: "已绑定", en: "Bound" },
+  xapiNotConfigured: { zh: "未绑定", en: "Not bound" },
+  xapiHint: {
+    zh: "Key 仅保存在本地浏览器，用于调用 xAPI 的社交发布与模型接口。",
+    en: "Key is stored locally in your browser, used to call xAPI social-publish and model endpoints.",
+  },
+
+  // Social announce (after creating a pact / on a market)
+  shareToSocial: { zh: "一键发布到社交平台", en: "Share to social" },
+  sharing: { zh: "发布中…", en: "Sharing…" },
+  shareDraftTitle: { zh: "AI 生成的推文文案", en: "AI-drafted post" },
+  sharePublished: { zh: "已发布到 𝕏！", en: "Published to 𝕏!" },
+  shareViewPost: { zh: "查看推文", en: "View post" },
+  shareNeedKey: { zh: "请先绑定 xAPI Key。", en: "Bind your xAPI key first." },
+  shareNeedBinding: { zh: "发布失败：xAPI 账号未绑定社交平台或余额不足。", en: "Publish failed: no social binding or insufficient xAPI balance." },
+  shareModelUsed: { zh: "文案模型", en: "Drafted by" },
 } as const;
 
 export type TKey = keyof typeof T;

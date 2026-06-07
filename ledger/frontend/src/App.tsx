@@ -7,7 +7,9 @@ import {
   Flag,
   RefreshCcw,
   Scale,
+  Share2,
   ShieldCheck,
+  Sparkles,
   Target,
   Trophy,
   UserRound,
@@ -410,6 +412,15 @@ function App() {
   // Per-market breach probability (bps) for card gauges
   const [probMap, setProbMap] = useState<Record<string, number>>({});
 
+  // xAPI integration (social reach + cheap models)
+  const [xapiKey, setXapiKey] = useState<string>(() => localStorage.getItem("repufi-xapi-key") || "");
+  const [showXapiModal, setShowXapiModal] = useState(false);
+  const [xapiKeyDraft, setXapiKeyDraft] = useState("");
+  // Social announce dialog: { title, tier, stake } once a pact is shareable
+  const [announce, setAnnounce] = useState<{ title: string; tier: string; stake: string } | null>(null);
+  const [announcePending, setAnnouncePending] = useState(false);
+  const [announceResult, setAnnounceResult] = useState<{ draft?: string; url?: string; modelUsed?: string; error?: string } | null>(null);
+
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
   const activeQuest = selected ? (selected.outcome === 0n ? (lang === "zh" ? "交易中" : "Trading") : tb(OUTCOMES_BI[Number(selected.outcome)])) : (lang === "zh" ? "探索" : "Scout");
@@ -575,6 +586,56 @@ function App() {
     await tx.wait();
     setMessage(T.msgQuestListed);
     await refresh();
+    // Offer one-click social announce for the freshly created pact
+    setAnnounceResult(null);
+    setAnnounce({
+      title: goalText.trim() || (lang === "zh" ? "新的 RepuFi 承诺事件" : "A new RepuFi commitment"),
+      tier: scenarioId === "l1-habit" ? "L1 Habit" : scenarioId === "l3-policy" ? "L3 Policy" : "L2 Delivery",
+      stake: `${bond} ${bondCurrency}`,
+    });
+  }
+
+  // Open social announce dialog for a market (also reachable from a card)
+  function openAnnounce(title: string, tier: string, stake: string) {
+    setAnnounceResult(null);
+    setAnnounce({ title, tier, stake });
+  }
+
+  // Draft (via xAPI cheap model) + publish to bound social account
+  async function publishAnnounce() {
+    if (!announce) return;
+    if (!xapiKey) {
+      setAnnounceResult({ error: t("shareNeedKey") });
+      return;
+    }
+    setAnnouncePending(true);
+    setAnnounceResult(null);
+    try {
+      const resp = await fetch(`${BRAIN_API_URL}/api/social/announce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...announce, marketUrl: window.location.origin, key: xapiKey }),
+      });
+      const data = await resp.json() as {
+        draft?: string;
+        modelUsed?: string;
+        publish?: { ok: boolean; url?: string; error?: string };
+      };
+      if (data.publish?.ok) {
+        setAnnounceResult({ draft: data.draft, url: data.publish.url, modelUsed: data.modelUsed });
+      } else {
+        // Still show the AI-drafted copy even if publish failed (no binding / balance)
+        setAnnounceResult({
+          draft: data.draft,
+          modelUsed: data.modelUsed,
+          error: data.publish?.error ?? t("shareNeedBinding"),
+        });
+      }
+    } catch {
+      setAnnounceResult({ error: t("shareNeedBinding") });
+    } finally {
+      setAnnouncePending(false);
+    }
   }
 
   async function takePosition() {
@@ -710,6 +771,14 @@ function App() {
             title="切换语言 / Switch language"
           >
             {lang === "zh" ? "EN" : "中"}
+          </button>
+          <button
+            className={xapiKey ? "toggle-on" : ""}
+            onClick={() => { setXapiKeyDraft(xapiKey); setShowXapiModal(true); }}
+            title="xAPI"
+          >
+            <Sparkles size={16} /> {t("xapiBind")}
+            <span className={`xapi-dot ${xapiKey ? "on" : ""}`} />
           </button>
           <button onClick={openCreate}><Target size={16} /> {t("newPact")}</button>
           <button className={showProfile ? "toggle-on" : ""} onClick={() => setShowProfile((value) => !value)}><UserRound size={16} /> {t("credibility")}</button>
@@ -1090,6 +1159,22 @@ function App() {
               <div className="actions">
                 <button onClick={selfResolve}><Flag size={16} /> {t("resolve")}</button>
                 <button onClick={claim}><BadgeCheck size={16} /> {t("claim")}</button>
+                <button
+                  className="share-btn"
+                  onClick={() => {
+                    const demo = DEMO_META[selectedId.toLowerCase()];
+                    const predType = selectedRow ? selectedRow.predType : Number(selected.predType);
+                    const title = demo
+                      ? tb(demo.title)
+                      : selectedRow
+                        ? cardTitle(selectedRow, lang, identityStore[selected.subject.toLowerCase()])
+                        : (lang === "zh" ? "RepuFi 承诺事件" : "A RepuFi commitment");
+                    const tier = PRED_LABELS[predType] ?? "Commitment";
+                    openAnnounce(title, tier, `${eth(selected.bond)} ${demo?.currency ?? "ETH"}`);
+                  }}
+                >
+                  <Share2 size={16} /> {t("shareToSocial")}
+                </button>
               </div>
 
               {/* Resolution pipeline: UMA OO → Multi-Agent → Human Review */}
@@ -1316,6 +1401,100 @@ function App() {
           </div>
         );
       })()}
+
+      {/* xAPI Bind Modal */}
+      {showXapiModal && (
+        <div className="modal-overlay" onClick={() => setShowXapiModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              <Sparkles size={18} />
+              <h2>{t("xapiModalTitle")}</h2>
+              <button className="icon-button close" onClick={() => setShowXapiModal(false)}><X size={16} /></button>
+            </div>
+            <p className="modal-sub">{t("xapiIntro")}</p>
+            <a className="xapi-link" href="https://www.xapi.to/" target="_blank" rel="noreferrer">
+              <Share2 size={14} /> {t("xapiOfficial")} — xapi.to
+            </a>
+            <div className={`xapi-status ${xapiKey ? "on" : ""}`}>
+              {xapiKey ? `✓ ${t("xapiConfigured")}` : `○ ${t("xapiNotConfigured")}`}
+            </div>
+            <label>
+              {t("xapiKeyLabel")}
+              <input
+                placeholder={t("xapiKeyPlaceholder")}
+                value={xapiKeyDraft}
+                onChange={(e) => setXapiKeyDraft(e.target.value)}
+              />
+            </label>
+            <button
+              className="wide primary"
+              onClick={() => {
+                const k = xapiKeyDraft.trim();
+                setXapiKey(k);
+                localStorage.setItem("repufi-xapi-key", k);
+                setShowXapiModal(false);
+                setMessage(T.xapiSaved);
+              }}
+            >
+              <Sparkles size={16} /> {t("xapiSave")}
+            </button>
+            <div className="hint-box">{t("xapiHint")}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Social Announce Modal */}
+      {announce && (
+        <div className="modal-overlay" onClick={() => !announcePending && setAnnounce(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              <Share2 size={18} />
+              <h2>{t("shareToSocial")}</h2>
+              <button className="icon-button close" onClick={() => !announcePending && setAnnounce(null)}><X size={16} /></button>
+            </div>
+            <p className="bet-market-title">{announce.title}</p>
+            <div className="bet-side-banner commit">
+              <span>{announce.tier}</span>
+              <strong>{announce.stake}</strong>
+            </div>
+
+            {announceResult?.draft && (
+              <div className="brain-result accepted">
+                <strong>{t("shareDraftTitle")}{announceResult.modelUsed ? ` · ${t("shareModelUsed")} ${announceResult.modelUsed}` : ""}</strong>
+                <p style={{ margin: "6px 0 0", lineHeight: 1.5 }}>{announceResult.draft}</p>
+              </div>
+            )}
+            {announceResult?.url && (
+              <a className="xapi-link" href={announceResult.url} target="_blank" rel="noreferrer">
+                ✓ {t("sharePublished")} — {t("shareViewPost")}
+              </a>
+            )}
+            {announceResult?.error && (
+              <div className="brain-result rejected">
+                <strong>{announceResult.error}</strong>
+              </div>
+            )}
+
+            {!announceResult?.url && (
+              <button className="wide primary" onClick={publishAnnounce} disabled={announcePending}>
+                <Share2 size={16} /> {announcePending ? t("sharing") : t("shareToSocial")}
+              </button>
+            )}
+            {!xapiKey && (
+              <div className="hint-box">
+                {t("shareNeedKey")}
+                <button
+                  className="adopt-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={() => { setAnnounce(null); setXapiKeyDraft(xapiKey); setShowXapiModal(true); }}
+                >
+                  {t("xapiBind")}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
