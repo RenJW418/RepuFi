@@ -571,12 +571,19 @@ function App() {
                 Demo markets shown until local chain events are available.
               </div>
               {SAMPLE_MARKETS.map((market) => (
-                <button key={market.rank} className="market-row sample-row" onClick={openCreate}>
-                  <span className="market-rank">#{market.rank}</span>
-                  <span className="market-main">
-                    <strong>{market.title}</strong>
-                    <small>{market.meta} · {market.odds} breach odds</small>
-                  </span>
+                <button key={market.rank} className="market-card sample-row" onClick={openCreate}>
+                  <div className="mc-header">
+                    <span className="mc-badge">L2 Delivery</span>
+                    <span className="mc-deadline">30d</span>
+                  </div>
+                  <p className="mc-title">{market.title}</p>
+                  <div className="mc-footer">
+                    <span className="mc-bond">{market.meta.split("·")[1]?.trim()}</span>
+                    <span className="mc-prob">{market.odds} breach</span>
+                  </div>
+                  <div className="mc-prob-bar">
+                    <span style={{ width: market.odds }} />
+                  </div>
                 </button>
               ))}
               <button className="wide primary" onClick={openCreate}><Target size={16} /> Create a Real Pact</button>
