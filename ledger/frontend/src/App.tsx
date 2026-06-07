@@ -195,6 +195,44 @@ const SAMPLE_MARKETS = [
 
 const SAMPLE_ODDS = [18, 28, 24, 37, 34, 44, 39, 52, 46, 38.75];
 
+// On-chain demo pact metadata (keyed by Sepolia pactId from seedPlaza).
+// Lets the three live demo markets render with named titles + identity instead
+// of the generic "0x30e3..." subject, so the recorded demo shows a full loop.
+interface DemoMeta {
+  title: string;
+  displayName: string;
+  author: string;
+  currency: "ETH" | "USDC";
+  kyc: boolean;
+  twitterVerified: boolean;
+}
+const DEMO_META: Record<string, DemoMeta> = {
+  "0xccea0049fab57856ae539239a6b2de008de6d52c03b5e479bf7f368ed46592d0": {
+    title: "姚帅能否做到连续 30 天早睡早起（每天 23:00 前睡、7:00 前起）？",
+    displayName: "姚帅",
+    author: "@yaoshuai",
+    currency: "ETH",
+    kyc: true,
+    twitterVerified: true,
+  },
+  "0xef8f3f831467b77112d1e571ced156bd4a50d4a8444b411a26a1e1d7014d309b": {
+    title: "RepuFi 项目方能否在 Q3（7/1–9/30）前完成主网上线并公布合约地址？",
+    displayName: "RepuFi 项目方",
+    author: "@RepuFi_team",
+    currency: "ETH",
+    kyc: true,
+    twitterVerified: true,
+  },
+  "0x0a9df538d952ba4e0ab02fb11767a4213f56c065a2a5308ee42cab7832e5aacb": {
+    title: "特朗普能否兑现中期选举承诺：任内将通胀率降至 3% 以下？",
+    displayName: "Donald Trump",
+    author: "@realDonaldTrump",
+    currency: "USDC",
+    kyc: true,
+    twitterVerified: true,
+  },
+};
+
 // Polymarket-style circular probability gauge (shows YES = kept probability)
 function ProbGauge({ breachPct }: { breachPct: number }) {
   const keptPct = Math.max(0, Math.min(100, 100 - breachPct));
@@ -783,8 +821,17 @@ function App() {
               const isActive = row.id === selectedId;
               const tier = PRED_LABELS[row.predType] ?? "Commitment";
               const identity = identityStore[row.subject.toLowerCase()];
+              const demo = DEMO_META[row.id.toLowerCase()];
               const breach = (probMap[row.id] ?? 5000) / 100; // bps → pct
               const kept = 100 - breach;
+              const title = demo?.title ?? cardTitle(row, identity);
+              const iconText = demo?.displayName.slice(0, 2) ?? tier.slice(0, 2);
+              const catLabel = demo ? `${tier} · ${demo.displayName}` : tier;
+              const currency = demo?.currency ?? "ETH";
+              // identity: prefer explicitly linked, else fall back to demo metadata
+              const xHandle = identity?.twitterHandle ?? demo?.author?.replace(/^@/, "");
+              const xVerified = identity?.twitterVerified ?? demo?.twitterVerified ?? false;
+              const kycPassed = identity?.kycPassed ?? demo?.kyc ?? false;
               return (
                 <div
                   key={row.id}
@@ -792,10 +839,10 @@ function App() {
                   onClick={() => setSelectedId(row.id)}
                 >
                   <div className="pm-card-top">
-                    <div className="pm-icon">{tier.slice(0, 2)}</div>
+                    <div className="pm-icon">{iconText}</div>
                     <div className="pm-title-wrap">
-                      <p className="pm-title">{cardTitle(row, identity)}</p>
-                      <span className="pm-cat">{tier}</span>
+                      <p className="pm-title">{title}</p>
+                      <span className="pm-cat">{catLabel}</span>
                     </div>
                     <ProbGauge breachPct={breach} />
                   </div>
@@ -814,12 +861,12 @@ function App() {
                     </button>
                   </div>
                   <div className="pm-footer">
-                    <span className="pm-vol">{eth(row.bond)} ETH bond</span>
+                    <span className="pm-vol">{eth(row.bond)} {currency} staked</span>
                     <div className="pm-ids">
-                      {identity?.twitterHandle
-                        ? <span className="id-badge twitter">𝕏 {identity.twitterHandle}</span>
+                      {xVerified && xHandle
+                        ? <span className="id-badge twitter">𝕏 @{xHandle}</span>
                         : <span className="id-badge unverified">Unverified</span>}
-                      {identity?.kycPassed && <span className="id-badge kyc">KYC ✓</span>}
+                      {kycPassed && <span className="id-badge kyc">KYC ✓</span>}
                       <span className="pm-deadline">{timeLeft(row.deadline)}</span>
                     </div>
                   </div>
