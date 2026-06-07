@@ -142,6 +142,33 @@ const SAMPLE_MARKETS = [
 
 const SAMPLE_ODDS = [18, 28, 24, 37, 34, 44, 39, 52, 46, 38.75];
 
+// Polymarket-style circular probability gauge (shows YES = kept probability)
+function ProbGauge({ breachPct }: { breachPct: number }) {
+  const keptPct = Math.max(0, Math.min(100, 100 - breachPct));
+  const r = 22;
+  const circ = 2 * Math.PI * r;
+  const dash = (keptPct / 100) * circ;
+  return (
+    <div className="prob-gauge" aria-label={`${keptPct.toFixed(0)}% chance kept`}>
+      <svg viewBox="0 0 56 56" width="56" height="56">
+        <circle cx="28" cy="28" r={r} className="pg-track" />
+        <circle
+          cx="28"
+          cy="28"
+          r={r}
+          className="pg-fill"
+          strokeDasharray={`${dash} ${circ}`}
+          transform="rotate(-90 28 28)"
+        />
+      </svg>
+      <div className="pg-label">
+        <strong>{keptPct.toFixed(0)}%</strong>
+        <span>kept</span>
+      </div>
+    </div>
+  );
+}
+
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
@@ -203,6 +230,9 @@ function App() {
   const [showResolution, setShowResolution] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Per-market breach probability (bps) for card gauges
+  const [probMap, setProbMap] = useState<Record<string, number>>({});
+
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId), [rows, selectedId]);
   const totalLiquidity = selected ? selected.commitPool + selected.skepticPool + selected.bond : 0n;
   const activeQuest = selected ? (selected.outcome === 0n ? "Trading" : OUTCOMES[Number(selected.outcome)]) : "Scout";
@@ -217,6 +247,22 @@ function App() {
     setMessage(nextRows.length
       ? `${nextRows.length} market${nextRows.length > 1 ? "s" : ""} loaded.`
       : "No markets yet. Create a pact to start.");
+
+    // Batch-fetch breach probability for every market so each card can show a gauge
+    if (nextRows.length) {
+      const { market } = getReadContracts();
+      const entries = await Promise.all(
+        nextRows.map(async (row) => {
+          try {
+            const bps = await market.impliedBreachProb(row.id);
+            return [row.id, Number(bps)] as const;
+          } catch {
+            return [row.id, 5000] as const; // default 50%
+          }
+        }),
+      );
+      setProbMap(Object.fromEntries(entries));
+    }
   }
 
   async function refreshDetail(id: string) {
@@ -617,26 +663,37 @@ function App() {
               </div>
               {SAMPLE_MARKETS
                 .filter((m) => activeCategory === "All" || m.tier.startsWith(activeCategory))
-                .map((market) => (
-                <button key={market.id} className="market-card sample-row" onClick={openCreate}>
-                  <div className="mc-header">
-                    <span className="mc-badge">{market.tier}</span>
-                    <span className="mc-deadline">{market.deadline}</span>
-                  </div>
-                  <p className="mc-title">{market.title}</p>
-                  <div className="mc-author-row">
-                    {market.twitterVerified && <span className="id-badge twitter">𝕏 {market.author}</span>}
-                    {market.kyc && <span className="id-badge kyc">KYC ✓</span>}
-                  </div>
-                  <div className="mc-footer">
-                    <span className="mc-bond">{market.bond} ETH bond</span>
-                    <span className="mc-prob">{market.odds} breach</span>
-                  </div>
-                  <div className="mc-prob-bar">
-                    <span style={{ width: market.odds }} />
-                  </div>
-                </button>
-              ))}
+                .map((market) => {
+                  const breach = parseFloat(market.odds);
+                  return (
+                    <div key={market.id} className="pm-card sample-row" onClick={openCreate}>
+                      <div className="pm-card-top">
+                        <div className="pm-icon">{market.tier.slice(0, 2)}</div>
+                        <div className="pm-title-wrap">
+                          <p className="pm-title">{market.title}</p>
+                          <span className="pm-cat">{market.tier}</span>
+                        </div>
+                        <ProbGauge breachPct={breach} />
+                      </div>
+                      <div className="pm-actions">
+                        <button className="pm-btn commit" onClick={(e) => { e.stopPropagation(); openCreate(); }}>
+                          Commit <b>{(100 - breach).toFixed(0)}¢</b>
+                        </button>
+                        <button className="pm-btn skeptic" onClick={(e) => { e.stopPropagation(); openCreate(); }}>
+                          Skeptic <b>{breach.toFixed(0)}¢</b>
+                        </button>
+                      </div>
+                      <div className="pm-footer">
+                        <span className="pm-vol">{market.bond} ETH bond</span>
+                        <div className="pm-ids">
+                          {market.twitterVerified && <span className="id-badge twitter">𝕏 {market.author}</span>}
+                          {market.kyc && <span className="id-badge kyc">KYC ✓</span>}
+                          <span className="pm-deadline">{market.deadline}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               <button className="wide primary" onClick={openCreate}><Target size={16} /> Create a Real Pact</button>
             </div>
           ) : null}
@@ -647,36 +704,47 @@ function App() {
               const isActive = row.id === selectedId;
               const tier = PRED_LABELS[row.predType] ?? "Commitment";
               const identity = identityStore[row.subject.toLowerCase()];
+              const breach = (probMap[row.id] ?? 5000) / 100; // bps → pct
+              const kept = 100 - breach;
               return (
-                <button
+                <div
                   key={row.id}
-                  className={`market-card ${isActive ? "active" : ""}`}
+                  className={`pm-card ${isActive ? "active" : ""}`}
                   onClick={() => setSelectedId(row.id)}
                 >
-                  <div className="mc-header">
-                    <span className="mc-badge">{tier}</span>
-                    <span className="mc-deadline">{timeLeft(row.deadline)}</span>
-                  </div>
-                  <p className="mc-title">{cardTitle(row, identity)}</p>
-                  <div className="mc-author-row">
-                    {identity?.twitterHandle
-                      ? <span className="id-badge twitter">𝕏 {identity.twitterHandle}</span>
-                      : <span className="id-badge unverified">Unverified</span>
-                    }
-                    {identity?.kycPassed && <span className="id-badge kyc">KYC ✓</span>}
-                  </div>
-                  <div className="mc-footer">
-                    <span className="mc-bond">{eth(row.bond)} ETH bond</span>
-                    <span className="mc-prob">
-                      {isActive && selected ? pct(breachProb) : "—"} breach
-                    </span>
-                  </div>
-                  {isActive && selected ? (
-                    <div className="mc-prob-bar">
-                      <span style={{ width: `${Number(breachProb) / 100}%` }} />
+                  <div className="pm-card-top">
+                    <div className="pm-icon">{tier.slice(0, 2)}</div>
+                    <div className="pm-title-wrap">
+                      <p className="pm-title">{cardTitle(row, identity)}</p>
+                      <span className="pm-cat">{tier}</span>
                     </div>
-                  ) : null}
-                </button>
+                    <ProbGauge breachPct={breach} />
+                  </div>
+                  <div className="pm-actions">
+                    <button
+                      className="pm-btn commit"
+                      onClick={(e) => { e.stopPropagation(); setSelectedId(row.id); setSide(0); focusPanel(detailRef, "detail"); }}
+                    >
+                      Commit <b>{kept.toFixed(0)}¢</b>
+                    </button>
+                    <button
+                      className="pm-btn skeptic"
+                      onClick={(e) => { e.stopPropagation(); setSelectedId(row.id); setSide(1); focusPanel(detailRef, "detail"); }}
+                    >
+                      Skeptic <b>{breach.toFixed(0)}¢</b>
+                    </button>
+                  </div>
+                  <div className="pm-footer">
+                    <span className="pm-vol">{eth(row.bond)} ETH bond</span>
+                    <div className="pm-ids">
+                      {identity?.twitterHandle
+                        ? <span className="id-badge twitter">𝕏 {identity.twitterHandle}</span>
+                        : <span className="id-badge unverified">Unverified</span>}
+                      {identity?.kycPassed && <span className="id-badge kyc">KYC ✓</span>}
+                      <span className="pm-deadline">{timeLeft(row.deadline)}</span>
+                    </div>
+                  </div>
+                </div>
               );
             })}
         </div>
